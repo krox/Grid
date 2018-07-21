@@ -51,6 +51,7 @@ class MixedPrecisionFlexibleGeneralisedMinimalResidual : public OperatorFunction
   GridStopWatch QrTimer;
   GridStopWatch CompSolutionTimer;
   GridStopWatch ChangePrecTimer;
+  GridStopWatch AllocationTimer;
 
   Eigen::MatrixXcd H;
 
@@ -106,6 +107,7 @@ class MixedPrecisionFlexibleGeneralisedMinimalResidual : public OperatorFunction
     QrTimer.Reset();
     CompSolutionTimer.Reset();
     ChangePrecTimer.Reset();
+    AllocationTimer.Reset();
 
     GridStopWatch SolverTimer;
     SolverTimer.Start();
@@ -140,6 +142,7 @@ class MixedPrecisionFlexibleGeneralisedMinimalResidual : public OperatorFunction
         std::cout << GridLogMessage << "MPFGMRES Time elapsed: QR         " <<           QrTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "MPFGMRES Time elapsed: CompSol    " << CompSolutionTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "MPFGMRES Time elapsed: PrecChange " <<   ChangePrecTimer.Elapsed() << std::endl;
+        std::cout << GridLogMessage << "MPFGMRES Time elapsed: Allocs     " <<   AllocationTimer.Elapsed() << std::endl;
         return;
       }
     }
@@ -154,12 +157,14 @@ class MixedPrecisionFlexibleGeneralisedMinimalResidual : public OperatorFunction
 
     RealD cp = 0;
 
+    AllocationTimer.Start();
     FieldD w(src._grid);
     FieldD r(src._grid);
 
     // these should probably be made class members so that they are only allocated once, not in every restart
     std::vector<FieldD> v(RestartLength + 1, src._grid); for (auto &elem : v) elem = zero;
     std::vector<FieldD> z(RestartLength + 1, src._grid); for (auto &elem : z) elem = zero;
+    AllocationTimer.Stop();
 
     MatrixTimer.Start();
     LinOp.Op(psi, w);

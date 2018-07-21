@@ -49,6 +49,7 @@ class CommunicationAvoidingGeneralisedMinimalResidual : public OperatorFunction<
   GridStopWatch LinalgTimer;
   GridStopWatch QrTimer;
   GridStopWatch CompSolutionTimer;
+  GridStopWatch AllocationTimer;
 
   Eigen::MatrixXcd H;
 
@@ -96,6 +97,7 @@ class CommunicationAvoidingGeneralisedMinimalResidual : public OperatorFunction<
     LinalgTimer.Reset();
     QrTimer.Reset();
     CompSolutionTimer.Reset();
+    AllocationTimer.Reset();
 
     GridStopWatch SolverTimer;
     SolverTimer.Start();
@@ -128,6 +130,7 @@ class CommunicationAvoidingGeneralisedMinimalResidual : public OperatorFunction<
         std::cout << GridLogMessage << "CAGMRES Time elapsed: Linalg  " <<       LinalgTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "CAGMRES Time elapsed: QR      " <<           QrTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "CAGMRES Time elapsed: CompSol " << CompSolutionTimer.Elapsed() << std::endl;
+        std::cout << GridLogMessage << "CAGMRES Time elapsed: Allocs  " <<   AllocationTimer.Elapsed() << std::endl;
         return;
       }
     }
@@ -142,11 +145,13 @@ class CommunicationAvoidingGeneralisedMinimalResidual : public OperatorFunction<
 
     RealD cp = 0;
 
+    AllocationTimer.Start();
     Field w(src._grid);
     Field r(src._grid);
 
     // this should probably be made a class member so that it is only allocated once, not in every restart
     std::vector<Field> v(RestartLength + 1, src._grid); for (auto &elem : v) elem = zero;
+    AllocationTimer.Stop();
 
     MatrixTimer.Start();
     LinOp.Op(psi, w);
