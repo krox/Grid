@@ -386,6 +386,7 @@ namespace Grid {
 	  (*this)(Linop,in[k],out[k]);
 	}
       };
+      virtual ~OperatorFunction() = default;
     };
 
     template<class Field> class LinearFunction {
