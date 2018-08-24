@@ -33,6 +33,13 @@ using namespace std;
 using namespace Grid;
 using namespace Grid::QCD;
 
+// Enable control of nbasis from the compiler command line
+// NOTE to self: Copy the value of CXXFLAGS from the makefile and call make as follows:
+//   make CXXFLAGS="-DNBASIS=24 VALUE_OF_CXXFLAGS_IN_MAKEFILE" Test_wilson_mg
+#ifndef NBASIS
+#define NBASIS 40
+#endif
+
 int main(int argc, char **argv) {
 
   Grid_init(&argc, &argv);
@@ -76,7 +83,7 @@ int main(int argc, char **argv) {
   LevelInfo levelInfo(FGrid, mgParams);
 
   // Note: We do chiral doubling, so actually only nbasis/2 full basis vectors are used
-  const int nbasis = 40;
+  const int nbasis = NBASIS; static_assert((nbasis & 0x1) == 0, "");
 
   WilsonFermionR Dw(Umu, *FGrid, *FrbGrid, mass);
 
