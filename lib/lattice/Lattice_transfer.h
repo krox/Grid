@@ -105,22 +105,24 @@ inline void blockProject(Lattice<iVector<CComplex,nbasis > > &coarseData,
 
   coarseData=zero;
 
-  // Loop over coars parallel, and then loop over fine associated with coarse.
-  parallel_for(int sf=0;sf<fine->oSites();sf++){
+  std::vector<std::vector<int>> lookUpTable(coarse->oSites());
 
+  for(int sf = 0; sf < fine->oSites(); sf++) {
     int sc;
     std::vector<int> coor_c(_ndimension);
     std::vector<int> coor_f(_ndimension);
-    Lexicographic::CoorFromIndex(coor_f,sf,fine->_rdimensions);
-    for(int d=0;d<_ndimension;d++) coor_c[d]=coor_f[d]/block_r[d];
-    Lexicographic::IndexFromCoor(coor_c,sc,coarse->_rdimensions);
+    Lexicographic::CoorFromIndex(coor_f, sf, fine->_rdimensions);
+    for(int d = 0; d < _ndimension; d++) coor_c[d] = coor_f[d] / block_r[d];
+    Lexicographic::IndexFromCoor(coor_c, sc, coarse->_rdimensions);
+    lookUpTable[sc].push_back(sf);
+  }
 
-PARALLEL_CRITICAL
-    for(int i=0;i<nbasis;i++) {
-
-      coarseData._odata[sc](i)=coarseData._odata[sc](i)
-	+ innerProduct(Basis[i]._odata[sf],fineData._odata[sf]);
-
+  // Thread over coarse sites so we can get rid of the critical region
+  parallel_for(int sc = 0; sc < coarse->oSites(); sc++) {
+    for(int i = 0; i < nbasis; i++) {
+      for(auto sf : lookUpTable[sc]) {
+        coarseData._odata[sc](i) = coarseData._odata[sc](i) + innerProduct(Basis[i]._odata[sf], fineData._odata[sf]);
+      }
     }
   }
   return;
