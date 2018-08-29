@@ -104,5 +104,77 @@ public:
   }
 };
 
+class GridPerfMonitor {
+private:
+  GridStopWatch stopWatch;
+  const double flop; // Holds value for one call
+  const double byte; // Holds value for one call
+  double calls;
+
+public:
+  GridPerfMonitor(double _flop = 0., double _byte = 0.)
+    : stopWatch()
+    , flop(_flop)
+    , byte(_byte)
+    , calls(0) {
+  }
+
+  void Start(void) {
+    stopWatch.Start();
+  }
+
+  void Stop(double _calls = 1) {
+    stopWatch.Stop();
+    calls += _calls;
+  }
+
+  void Reset(void) {
+    stopWatch.Reset();
+    calls = 0.;
+  }
+
+  GridTime Elapsed(void) const {
+    return stopWatch.Elapsed();
+  }
+
+  uint64_t useconds(void) const {
+    return stopWatch.useconds();
+  }
+
+  double Seconds(void) const {
+    return 1e-6 * stopWatch.useconds();
+  }
+
+  double SecondsPerCall(void) const {
+    return Seconds() / Calls();
+  }
+
+  double Flop(void) const {
+    return flop;
+  }
+
+  double Byte(void) const {
+    return byte;
+  }
+
+  double Intensity(void) const {
+    return flop/byte;
+  }
+
+  double Calls(void) const {
+    return calls;
+  }
+};
+
+inline std::ostream& operator<< (std::ostream & stream, const GridPerfMonitor & perf) {
+  stream << std::scientific
+         << "Calls[#] = "        << perf.Calls()
+         << " Time[s] = "        << perf.Seconds()
+         << " Intensity[F/B] = " << perf.Intensity()
+         << " Perf[F/s] = "      << perf.Flop() / perf.SecondsPerCall()
+         << " Traffic[B/s] = "   << perf.Byte() / perf.SecondsPerCall();
+  return stream;
+}
+
 }
 #endif
