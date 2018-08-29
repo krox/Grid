@@ -105,12 +105,18 @@ namespace Grid {
     std::vector<Lattice<Fobj> > subspace;
     int checkerboard;
 
+    std::map<std::string, GridStopWatch> Timers;
+
   Aggregation(GridBase *_CoarseGrid,GridBase *_FineGrid,int _checkerboard) : 
     CoarseGrid(_CoarseGrid),
       FineGrid(_FineGrid),
       subspace(nbasis,_FineGrid),
       checkerboard(_checkerboard)
 	{
+          Timers.emplace("Total", GridStopWatch());
+          Timers.emplace("Orthogonalise", GridStopWatch());
+          Timers.emplace("CreateVectors", GridStopWatch());
+          ResetTimers();
 	};
   
     void Orthogonalise(void){
@@ -203,6 +209,8 @@ namespace Grid {
     */
     virtual void CreateSubspace(GridParallelRNG  &RNG,LinearOperatorBase<FineField> &hermop,int nn=nbasis) {
 
+      Timers["Total"].Start();
+      Timers["CreateVectors"].Start();
       RealD scale;
 
       ConjugateGradient<FineField> CG(1.0e-2,10000);
@@ -232,9 +240,27 @@ namespace Grid {
 	subspace[b]   = noise;
 
       }
+      Timers["CreateVectors"].Stop();
 
+      Timers["Orthogonalise"].Start();
       Orthogonalise();
+      Timers["Orthogonalise"].Stop();
 
+      Timers["Total"].Stop();
+    }
+
+    void ResetTimers() {
+      for(auto &elem : Timers)
+        elem.second.Reset();
+    }
+
+    void ReportTimings() {
+      double timeTotal = Timers["Total"].useconds();
+      for(auto &elem : Timers) {
+        double timeElem = elem.second.useconds();
+        std::cout << GridLogMG << "Time elapsed: Aggregation.CreateSubspace -- " << elem.first << " " << elem.second.Elapsed()
+                  << " (" << std::defaultfloat << timeElem / timeTotal * 100 << "%)" << std::endl;
+      }
     }
   };
   // Fine Object == (per site) type of fine field
@@ -259,7 +285,8 @@ namespace Grid {
 
     std::vector<CoarseMatrix> A;
 
-      
+    std::map<std::string, GridStopWatch> Timers;
+
     ///////////////////////
     // Interface
     ///////////////////////
@@ -356,11 +383,22 @@ namespace Grid {
       Stencil(&CoarseGrid,geom.npoint,Even,geom.directions,geom.displacements),
       A(geom.npoint,&CoarseGrid)
     {
+      Timers.emplace("Total", GridStopWatch());
+      Timers.emplace("Misc", GridStopWatch());
+      Timers.emplace("Copy", GridStopWatch());
+      Timers.emplace("LatticeCoordinate", GridStopWatch());
+      Timers.emplace("Orthogonalise", GridStopWatch());
+      Timers.emplace("ApplyOperator", GridStopWatch());
+      Timers.emplace("PickBlocks", GridStopWatch());
+      Timers.emplace("Restriction", GridStopWatch());
+      Timers.emplace("LinkConstruction", GridStopWatch());
+      ResetTimers();
     };
 
     void CoarsenOperator(GridBase *FineGrid,LinearOperatorBase<Lattice<Fobj> > &linop,
 			 Aggregation<Fobj,CComplex,nbasis> & Subspace){
-
+      Timers["Total"].Start();
+      Timers["Misc"].Start();
       FineField iblock(FineGrid); // contributions from within this block
       FineField oblock(FineGrid); // contributions from outwith this block
 
@@ -374,10 +412,14 @@ namespace Grid {
       CoarseVector iProj(Grid()); 
       CoarseVector oProj(Grid()); 
       CoarseScalar InnerProd(Grid()); 
+      Timers["Misc"].Stop();
 
+      Timers["Orthogonalise"].Start();
       // Orthogonalise the subblocks over the basis
       blockOrthogonalise(InnerProd,Subspace.subspace);
+      Timers["Orthogonalise"].Stop();
 
+      Timers["Misc"].Start();
       // Compute the matrix elements of linop between this orthonormal
       // set of vectors.
       int self_stencil=-1;
@@ -388,31 +430,41 @@ namespace Grid {
 	}
       }
       assert(self_stencil!=-1);
+      Timers["Misc"].Stop();
 
       for(int i=0;i<nbasis;i++){
+        Timers["Copy"].Start();
 	phi=Subspace.subspace[i];
+        Timers["Copy"].Stop();
 	
 	std::cout<<GridLogMessage<<"("<<i<<").."<<std::endl;
 
 	for(int p=0;p<geom.npoint;p++){ 
 
+          Timers["Misc"].Start();
 	  int dir   = geom.directions[p];
 	  int disp  = geom.displacements[p];
 
 	  Integer block=(FineGrid->_rdimensions[dir])/(Grid()->_rdimensions[dir]);
+          Timers["Misc"].Stop();
 
+          Timers["LatticeCoordinate"].Start();
 	  LatticeCoordinate(coor,dir);
+          Timers["LatticeCoordinate"].Stop();
 
+          Timers["ApplyOperator"].Start();
 	  if ( disp==0 ){
 	    linop.OpDiag(phi,Mphi);
 	  }
 	  else  {
 	    linop.OpDir(phi,Mphi,dir,disp); 
 	  }
+          Timers["ApplyOperator"].Stop();
 
 	  ////////////////////////////////////////////////////////////////////////
 	  // Pick out contributions coming from this cell and neighbour cell
 	  ////////////////////////////////////////////////////////////////////////
+          Timers["PickBlocks"].Start();
 	  if ( disp==0 ) {
 	    iblock = Mphi;
 	    oblock = zero;
@@ -425,11 +477,16 @@ namespace Grid {
 	  } else {
 	    assert(0);
 	  }
+          Timers["PickBlocks"].Stop();
 
+          Timers["Restriction"].Start();
 	  Subspace.ProjectToSubspace(iProj,iblock);
 	  Subspace.ProjectToSubspace(oProj,oblock);
 	  //	  blockProject(iProj,iblock,Subspace.subspace);
 	  //	  blockProject(oProj,oblock,Subspace.subspace);
+          Timers["Restriction"].Stop();
+
+          Timers["LinkConstruction"].Start();
 	  parallel_for(int ss=0;ss<Grid()->oSites();ss++){
 	    for(int j=0;j<nbasis;j++){
 	      if( disp!= 0 ) {
@@ -438,6 +495,7 @@ namespace Grid {
 	      A[self_stencil]._odata[ss](j,i) =	A[self_stencil]._odata[ss](j,i) + iProj._odata[ss](j);
 	    }
 	  }
+          Timers["LinkConstruction"].Stop();
 	}
       }
 
@@ -465,6 +523,7 @@ namespace Grid {
       //      ForceHermitian();
       // AssertHermitian();
       // ForceDiagonal();
+      Timers["Total"].Stop();
     }
     void ForceDiagonal(void) {
 
@@ -519,7 +578,21 @@ namespace Grid {
       std::cout<<GridLogMessage<<"Norm diff local "<< norm2(Diff)<<std::endl;
       std::cout<<GridLogMessage<<"Norm local "<< norm2(A[8])<<std::endl;
     }
-    
+
+    void ResetTimers() {
+      for(auto &elem : Timers)
+        elem.second.Reset();
+    }
+
+    void ReportTimings() {
+      double timeTotal = Timers["Total"].useconds();
+      for(auto &elem : Timers) {
+        double timeElem = elem.second.useconds();
+        std::cout << GridLogMG << "Time elapsed: CoarsenedMatrix.CoarsenOperator -- " << elem.first << " " << elem.second.Elapsed()
+                  << " (" << std::defaultfloat << timeElem / timeTotal * 100 << "%)" << std::endl;
+      }
+    }
+
   };
 
 }
