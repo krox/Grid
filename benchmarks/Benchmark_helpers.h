@@ -32,6 +32,28 @@ namespace Grid {
 
 namespace BenchmarkHelpers {
 
+#define BenchmarkFunction(function, flop, byte, nIter, ...)                                \
+  do {                                                                                     \
+    GridPerfMonitor perfMonitor(flop, byte);                                               \
+    perfMonitor.Start();                                                                   \
+    for(int i = 0; i < nIter; ++i) {                                                       \
+      function(__VA_ARGS__);                                                               \
+    }                                                                                      \
+    perfMonitor.Stop(nIter);                                                               \
+    std::cout << GridLogPerformance << "Kernel "#function": " << perfMonitor << std::endl; \
+  } while(0)
+
+#define BenchmarkExpression(expression, flop, byte, nIter)                                   \
+  do {                                                                                       \
+    GridPerfMonitor perfMonitor(flop, byte);                                                 \
+    perfMonitor.Start();                                                                     \
+    for(int i = 0; i < nIter; ++i) {                                                         \
+      expression;                                                                            \
+    }                                                                                        \
+    perfMonitor.Stop(nIter);                                                                 \
+    std::cout << GridLogPerformance << "Kernel "#expression": " << perfMonitor << std::endl; \
+  } while(0)
+
 class KernelPerf {
 public:
   std::string name;
