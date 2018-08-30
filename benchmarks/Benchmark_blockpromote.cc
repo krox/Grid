@@ -96,16 +96,8 @@ int main(int argc, char **argv) {
 
   double flop      = (2 * FSiteVecElems * (nBasis - 1) + 6 * FSiteVecElems * nBasis) * FVolume;
   double byte      = (1 * 1 + 3 * FSiteVecElems) * nBasis * FVolume * sizeof(Complex);
-  double footprint = (CSiteVecElems * CVolume + (nBasis + 1) * FSiteVecElems * FVolume) * sizeof(Complex);
 
-  KernelPerf perf("blockPromote", flop, byte, footprint);
-
-  {
-    double start = usecond();
-    for(int i = 0; i < nIter; ++i) blockPromote(CoarseVec, FineVec, Aggs.subspace);
-    double stop = usecond();
-    perf.reportPerformance(stop - start, nIter);
-  }
+  BenchmarkFunction(blockPromote, flop, byte, nIter, CoarseVec, FineVec, Aggs.subspace);
 
   Grid_finalize();
 }

@@ -85,38 +85,10 @@ int main(int argc, char **argv) {
   double byteMdir      = (CSiteVecElems * CSiteVecElems + 2 * CSiteVecElems) * CVolume * sizeof(Complex);
   double footprintMdir = (2 * CSiteVecElems + nStencil * CSiteVecElems * CSiteVecElems) * CVolume * sizeof(Complex);
 
-  KernelPerf coarseM("coarseM", flopM, byteM, footprintM);
-  KernelPerf coarseMdag("coarseMdag", flopM, byteM, footprintM); // TODO: with the current implementation of Mdag, this line is not correct
-  KernelPerf coarseMdir("coarseMdir", flopMdir, byteMdir, footprintMdir);
-  KernelPerf coarseMdiag("coarseMdiag", flopMdir, byteMdir, footprintMdir);
-
-  {
-    double start = usecond();
-    for(int i = 0; i < nIter; ++i) CoarseMatrix.M(CoarseVecIn, CoarseVecOut);
-    double stop = usecond();
-    coarseM.reportPerformance(stop - start, nIter);
-  }
-
-  {
-    double start = usecond();
-    for(int i = 0; i < nIter; ++i) CoarseMatrix.Mdag(CoarseVecIn, CoarseVecOut);
-    double stop = usecond();
-    coarseMdag.reportPerformance(stop - start, nIter);
-  }
-
-  {
-    double start = usecond();
-    for(int i = 0; i < nIter; ++i) CoarseMatrix.Mdir(CoarseVecIn, CoarseVecOut, 2, 1);
-    double stop = usecond();
-    coarseMdir.reportPerformance(stop - start, nIter);
-  }
-
-  {
-    double start = usecond();
-    for(int i = 0; i < nIter; ++i) CoarseMatrix.Mdiag(CoarseVecIn, CoarseVecOut);
-    double stop = usecond();
-    coarseMdiag.reportPerformance(stop - start, nIter);
-  }
+  BenchmarkFunction(CoarseMatrix.M,     flopM,    byteM,    nIter, CoarseVecIn, CoarseVecOut);
+  BenchmarkFunction(CoarseMatrix.Mdag,  flopM,    byteM,    nIter, CoarseVecIn, CoarseVecOut); // TODO: with the current implementation of Mdag, this line is not correct
+  BenchmarkFunction(CoarseMatrix.Mdir,  flopMdir, byteMdir, nIter, CoarseVecIn, CoarseVecOut, 2, 1);
+  BenchmarkFunction(CoarseMatrix.Mdiag, flopMdir, byteMdir, nIter, CoarseVecIn, CoarseVecOut);
 
   Grid_finalize();
 }

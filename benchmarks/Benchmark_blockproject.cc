@@ -145,24 +145,9 @@ int main(int argc, char **argv) {
 
   double flop      = (((FSiteVecElems - 1) + 1) * 2 + (FSiteVecElems)*6) * nBasis * FVolume;
   double byte      = (2 * 1 + 2 * FSiteVecElems) * nBasis * FVolume * sizeof(Complex);
-  double footprint = (CSiteVecElems * CVolume + (nBasis + 1) * FSiteVecElems * FVolume) * sizeof(Complex);
 
-  KernelPerf perfOriginal("blockProjectOriginal", flop, byte, footprint);
-  KernelPerf perfImproved("blockProjectImproved", flop, byte, footprint);
-
-  {
-    double start = usecond();
-    for(int i = 0; i < nIter; ++i) blockProjectOriginal(CoarseVecOriginal, FineVec, Aggs.subspace);
-    double stop = usecond();
-    perfOriginal.reportPerformance(stop - start, nIter);
-  }
-
-  {
-    double start = usecond();
-    for(int i = 0; i < nIter; ++i) blockProject(CoarseVec, FineVec, Aggs.subspace);
-    double stop = usecond();
-    perfImproved.reportPerformance(stop - start, nIter);
-  }
+  BenchmarkFunction(blockProjectOriginal, flop, byte, nIter, CoarseVecOriginal, FineVec, Aggs.subspace);
+  BenchmarkFunction(blockProject,         flop, byte, nIter, CoarseVec,         FineVec, Aggs.subspace);
 
   CoarseVecDiff = CoarseVecOriginal - CoarseVec;
   auto absDev   = norm2(CoarseVecDiff);
