@@ -34,6 +34,59 @@ Author: paboyle <paboyle@ph.ed.ac.uk>
 
 namespace Grid {
 
+  void printPerformanceMonitors(std::map<std::string, GridPerfMonitor> &perfMonitors) {
+    for(auto & elem: perfMonitors)
+      std::cout << GridLogPerformance << "Kernel "
+                << std::setw(25) << std::right
+                << elem.first << ": " << elem.second
+                << " Fraction[%] = "
+                << std::fixed
+                << 100 * elem.second.Seconds() / perfMonitors["Total"].Seconds() << std::endl;
+  }
+
+  class TimeProfiler {
+  public:
+    std::string Prefix;
+    std::map<std::string, GridStopWatch> StopWatches;
+
+    TimeProfiler() = default;
+
+    TimeProfiler(std::string const& prefix, std::vector<std::string> const &names)
+      : Prefix(prefix) {
+      for(auto &elem : names)
+        StopWatches[elem] = GridStopWatch();
+      Reset();
+    }
+
+    void Reset() {
+      for(auto &elem : StopWatches)
+        elem.second.Reset();
+    }
+
+    void Report(GridLogger & logger) {
+      double timeTotal = 0;
+      if(StopWatches.find("Total") != StopWatches.end()) {
+        timeTotal = StopWatches["Total"].useconds();
+      } else {
+        for(auto &elem : StopWatches)
+          timeTotal += elem.second.useconds();
+      }
+
+      for(auto &elem : StopWatches) {
+        double timeElem = elem.second.useconds();
+        std::cout << logger << "Time elapsed: "
+                  << Prefix << " -- "
+                  << elem.first << " " << elem.second.Elapsed()
+                  << " (" << std::defaultfloat << timeElem / timeTotal * 100 << "%)" << std::endl;
+      }
+    }
+
+    GridStopWatch & operator[](std::string const &name) {
+      return StopWatches[name];
+    }
+  };
+
+
   class Geometry {
     //    int dimension;
   public:
@@ -42,7 +95,7 @@ namespace Grid {
     std::vector<int> displacements;
 
   Geometry(int _d)  {
-  
+
       int base = (_d==5) ? 1:0;
 
       // make coarse grid stencil for 4d , not 5d
@@ -59,7 +112,7 @@ namespace Grid {
       }
       directions   [2*_d]=0;
       displacements[2*_d]=0;
-      
+
       //// report back
       std::cout<<GridLogMessage<<"directions    :";
       for(int d=0;d<npoint;d++) std::cout<< directions[d]<< " ";
@@ -68,7 +121,14 @@ namespace Grid {
       for(int d=0;d<npoint;d++) std::cout<< displacements[d]<< " ";
       std::cout<<std::endl;
     }
-  
+
+    // int dirDispToPoint(int dir, int disp) {
+    //   if(dir == 0 and disp == 0)
+    //     return 2*_d;
+    //   else
+    //     return (_d * dir + 1 - disp) / 2;
+    // }
+
     /*
       // Original cleaner code
     Geometry(int _d) : dimension(_d), npoint(2*_d+1), directions(npoint), displacements(npoint) {
@@ -86,10 +146,697 @@ namespace Grid {
       delta[directions[point]] = displacements[point];
       return delta;
     };
-    */    
+    */
 
   };
-  
+
+#define INHERIT_COARSENING_POLICY_TYPES(Policy)            \
+  typedef typename Policy::SiteSpinor       SiteSpinor;    \
+  typedef typename Policy::SiteLinkField    SiteLinkField; \
+  typedef typename Policy::SiteScalar       SiteScalar;    \
+  typedef typename Policy::FermionField     FermionField;  \
+  typedef typename Policy::LinkField        LinkField;     \
+  typedef typename Policy::ScalarField        ScalarField; \
+  typedef typename Policy::FineFermionField FineFermionField;
+
+#define INHERIT_COARSENING_POLICY_VARIABLES(Policy)         \
+  using Policy::Ncs; \
+  using Policy::Nbasis; \
+  using Policy::Nfs; \
+  using Policy::Nsb;
+
+  // Grid uses the policy pattern to generalise the Dirac operators.
+  // IMHO, we should do that with the multigrid-related stuff, too.
+  // This way, we are able to support multiple coarsening strategies, i.e., the
+  // original one Peter uses and also my one with explicit intact chirality = coarse spins.
+
+  template<class _FineFermionField, class Simd, int nbasis>
+  class OriginalCoarseningPolicy {
+  public:
+    /////////////////////////////////////////////
+    // Static variables
+    /////////////////////////////////////////////
+
+#define SpinIndex 1 // Need to do this temporarily, will be removed once the QCD namespace is gone
+    static const int Nbasis            = nbasis;
+    static const int Ncs               = 1; // number of coarse spin dofs
+           const int Nfs               = indexRank<SpinIndex, typename getVectorType<_FineFermionField>::type>(); // number of fine grid spin dofs
+           const int Nsb               = Nfs/Ncs; // spin blocking
+    static const bool isTwoSpinVersion = false;
+#undef SpinIndex
+
+    /////////////////////////////////////////////
+    // Type Definitions
+    /////////////////////////////////////////////
+
+    template<typename vtype> using iImplSpinor    = iVector<iScalar<iScalar<iScalar<vtype>>>, nbasis>;
+    template<typename vtype> using iImplLinkField = iMatrix<iScalar<iScalar<iScalar<vtype>>>, nbasis>;
+    template<typename vtype> using iImplScalar    = iScalar<iScalar<iScalar<vtype>>>;
+
+    typedef iImplSpinor<Simd>    SiteSpinor;
+    typedef iImplLinkField<Simd> SiteLinkField;
+    typedef iImplLinkField<Simd> SiteScalar;
+
+    // Needs to be called FermionField, too as in the Dirac operators, so that we can use it for coarsening just like the Dirac operators
+    typedef Lattice<SiteSpinor>    FermionField;
+    typedef Lattice<SiteLinkField> LinkField;
+    typedef Lattice<SiteScalar>    ScalarField;
+
+    typedef _FineFermionField                              FineFermionField;
+    typedef typename getVectorType<FineFermionField>::type FineSiteSpinor;
+
+    /////////////////////////////////////////////
+    // Member Functions
+    /////////////////////////////////////////////
+
+    std::string name() const { return "OriginalCoarseningPolicy"; }
+
+    // TODO: Think about refactoring these to take site vectors instead -> fewer indices
+
+    strong_inline void projectionKernel(FermionField & CoarseVec, FineFermionField const & BasisVec, FineFermionField const & FineVec,
+                                        int sc, int sf, int i) {
+      CoarseVec._odata[sc](i) = CoarseVec._odata[sc](i) + innerProduct(BasisVec._odata[sf], FineVec._odata[sf]);
+    }
+
+    strong_inline void promotionKernel(FermionField const & CoarseVec, FineFermionField const & BasisVec, FineFermionField & FineVec,
+                                       int sc, int sf, int i) {
+      if(i == 0)
+        FineVec._odata[sf] = CoarseVec._odata[sc](i) * BasisVec._odata[sf];
+      else
+        FineVec._odata[sf] = FineVec._odata[sf] + CoarseVec._odata[sc](i) * BasisVec._odata[sf];
+    }
+  };
+
+
+  template<class _FineFermionField, class Simd, int nbasis>
+  class TwoSpinCoarseningPolicy {
+  public:
+    /////////////////////////////////////////////
+    // Static variables
+    /////////////////////////////////////////////
+
+#define SpinIndex 1 // Need to do this temporarily, will be removed once the QCD namespace is gone
+    static const int Nbasis            = nbasis;
+    static const int Ncs               = 2; // number of coarse spin dofs
+           const int Nfs               = indexRank<SpinIndex, typename getVectorType<_FineFermionField>::type>(); // number of fine grid spin dofs
+           const int Nsb               = Nfs/Ncs; // spin blocking
+    static const bool isTwoSpinVersion = true;
+#undef SpinIndex
+
+    /////////////////////////////////////////////
+    // Type Definitions
+    /////////////////////////////////////////////
+
+    template<typename vtype> using iImplSpinor    = iScalar<iVector<iVector<vtype, nbasis>, Ncs>>; // Note, nbasis here is equivalent to nbasis/2 above
+    template<typename vtype> using iImplLinkField = iScalar<iMatrix<iMatrix<vtype, nbasis>, Ncs>>; // Note, nbasis here is equivalent to nbasis/2 above
+    template<typename vtype> using iImplScalar    = iScalar<iScalar<iScalar<vtype>>>;
+
+    typedef iImplSpinor<Simd>    SiteSpinor;
+    typedef iImplLinkField<Simd> SiteLinkField;
+    typedef iImplLinkField<Simd> SiteScalar;
+
+    // Needs to be called FermionField, too as in the Dirac operators, so that we can use it for coarsening just like the Dirac operators
+    typedef Lattice<SiteSpinor>    FermionField;
+    typedef Lattice<SiteLinkField> LinkField;
+    typedef Lattice<SiteScalar>    ScalarField;
+
+    typedef _FineFermionField                              FineFermionField;
+    typedef typename getVectorType<FineFermionField>::type FineSiteSpinor;
+
+    /////////////////////////////////////////////
+    // Member Functions
+    /////////////////////////////////////////////
+
+    std::string name() const { return "TwoSpinCoarseningPolicy"; }
+
+    // TODO: Think about refactoring these to take site vectors instead -> fewer indices
+
+    strong_inline void projectionKernel(FermionField & CoarseVec, FineFermionField const & BasisVec, FineFermionField const & FineVec,
+                                        int sc, int sf, int i) {
+      for(int s = 0; s < Nfs; s++) {
+        CoarseVec._odata[sc]()(s/Nsb)(i) = CoarseVec._odata[sc]()(s/Nsb)(i) +
+          TensorRemove(innerProduct(BasisVec._odata[sf]()(s), FineVec._odata[sf]()(s)));
+      }
+    }
+
+    strong_inline void promotionKernel(FermionField const & CoarseVec, FineFermionField const & BasisVec, FineFermionField & FineVec,
+                                       int sc, int sf, int i) {
+      iScalar<Simd> CoarseTmp; // -> need to add the tensor structure here, i.e., need to make the CoarseVec elem an iScalar
+      if(i == 0) {
+        for(int s = 0; s < Nfs; s++) {
+          CoarseTmp._internal = CoarseVec._odata[sc]()(s/Nsb)(i);
+          FineVec._odata[sf]()(s) = CoarseTmp * BasisVec._odata[sf]()(s);
+        }
+      } else {
+        for(int s = 0; s < Nfs; s++) {
+          CoarseTmp._internal = CoarseVec._odata[sc]()(s/Nsb)(i);
+          FineVec._odata[sf]()(s) = FineVec._odata[sf]()(s) + CoarseTmp * BasisVec._odata[sf]()(s);
+        }
+      }
+    }
+  };
+
+
+  template<class CoarseningPolicy>
+  class AggregationUsingPolicies : public CoarseningPolicy {
+  public:
+
+    /////////////////////////////////////////////
+    // Type Definitions
+    /////////////////////////////////////////////
+
+    INHERIT_COARSENING_POLICY_TYPES(CoarseningPolicy);
+    INHERIT_COARSENING_POLICY_VARIABLES(CoarseningPolicy);
+
+    /////////////////////////////////////////////
+    // Member Data
+    /////////////////////////////////////////////
+
+    GridBase *                    _coarseGrid;
+    GridBase *                    _fineGrid;
+    std::vector<FineFermionField> _subspace;
+    int                           _checkerBoard;
+
+    /////////////////////////////////////////////
+    // Member Functions
+    /////////////////////////////////////////////
+
+    AggregationUsingPolicies(GridBase *CoarseGrid, GridBase *FineGrid, int CheckerBoard)
+      : _coarseGrid(CoarseGrid)
+      , _fineGrid(FineGrid)
+      , _subspace(Nbasis, FineGrid)
+      , _checkerBoard(CheckerBoard) {
+      subdivides(_coarseGrid, _fineGrid);
+    }
+
+    void ProjectToSubspace(FermionField &CoarseVec, const FineFermionField &FineVec) {
+      int _ndimension = _coarseGrid->_ndimension;
+
+      // checks
+      assert(Nbasis == _subspace.size());
+      conformable(_coarseGrid, CoarseVec._grid);
+      conformable(_fineGrid, FineVec._grid);
+      for(int i = 0; i < Nbasis; i++) {
+        conformable(_subspace[i], FineVec);
+      }
+
+      std::vector<int> block_r(_ndimension);
+
+      for(int d = 0; d < _ndimension; d++) {
+        block_r[d] = _fineGrid->_rdimensions[d] / _coarseGrid->_rdimensions[d];
+        assert(block_r[d] * _coarseGrid->_rdimensions[d] == _fineGrid->_rdimensions[d]);
+      }
+
+      CoarseVec = zero;
+
+      std::vector<std::vector<int>> lookUpTable(_coarseGrid->oSites());
+
+      for(int sf = 0; sf < _fineGrid->oSites(); sf++) {
+        int              sc;
+        std::vector<int> coor_c(_ndimension);
+        std::vector<int> coor_f(_ndimension);
+        Lexicographic::CoorFromIndex(coor_f, sf, _fineGrid->_rdimensions);
+        for(int d = 0; d < _ndimension; d++) coor_c[d] = coor_f[d] / block_r[d];
+        Lexicographic::IndexFromCoor(coor_c, sc, _coarseGrid->_rdimensions);
+        lookUpTable[sc].push_back(sf);
+      }
+
+      // Thread over coarse sites so we can get rid of the critical region
+      parallel_for(int sc = 0; sc < _coarseGrid->oSites(); sc++) {
+        for(int i = 0; i < Nbasis; i++) {
+          for(auto sf : lookUpTable[sc]) {
+            CoarseningPolicy::projectionKernel(CoarseVec, _subspace[i], FineVec, sc, sf, i);
+          }
+        }
+      }
+      return;
+    }
+
+    void PromoteFromSubspace(const FermionField &CoarseVec, FineFermionField &FineVec) {
+      FineVec.checkerboard  = _subspace[0].checkerboard;
+      int       _ndimension = _coarseGrid->_ndimension;
+
+      // checks
+      assert(Nbasis == _subspace.size());
+      conformable(_coarseGrid, CoarseVec._grid);
+      conformable(_fineGrid, FineVec._grid);
+      for(int i = 0; i < Nbasis; i++) {
+        conformable(_subspace[i], FineVec);
+      }
+
+      std::vector<int> block_r(_ndimension);
+
+      for(int d = 0; d < _ndimension; d++) {
+        block_r[d] = _fineGrid->_rdimensions[d] / _coarseGrid->_rdimensions[d];
+        assert(block_r[d] * _coarseGrid->_rdimensions[d] == _fineGrid->_rdimensions[d]);
+      }
+
+      // Loop with a cache friendly loop ordering
+      parallel_region {
+        int              sc;
+        std::vector<int> coor_c(_ndimension);
+        std::vector<int> coor_f(_ndimension);
+
+        parallel_for_internal(int sf = 0; sf < _fineGrid->oSites(); sf++) {
+
+          Lexicographic::CoorFromIndex(coor_f, sf, _fineGrid->_rdimensions);
+          for(int d = 0; d < _ndimension; d++) coor_c[d] = coor_f[d] / block_r[d];
+          Lexicographic::IndexFromCoor(coor_c, sc, _coarseGrid->_rdimensions);
+
+          for(int i = 0; i < Nbasis; i++) {
+            CoarseningPolicy::promotionKernel(CoarseVec, _subspace[i], FineVec, sc, sf, i);
+          }
+        }
+      }
+      return;
+    }
+
+    void CreateSubspaceRandom(GridParallelRNG &RNG) {
+      for(int i = 0; i < Nbasis; i++) {
+        random(RNG, _subspace[i]);
+        std::cout << GridLogMessage << " norm subspace[" << i << "] " << norm2(_subspace[i]) << std::endl;
+      }
+      // Orthogonalise();
+    }
+  };
+
+  template<class CoarseningPolicy>
+  class CoarsenedMatrixUsingPolicies : SparseMatrixBase<typename CoarseningPolicy::FermionField>, public CoarseningPolicy {
+  public:
+
+    /////////////////////////////////////////////
+    // Type Definitions
+    /////////////////////////////////////////////
+
+    INHERIT_COARSENING_POLICY_TYPES(CoarseningPolicy);
+    INHERIT_COARSENING_POLICY_VARIABLES(CoarseningPolicy);
+
+    /////////////////////////////////////////////
+    // Member Data
+    /////////////////////////////////////////////
+
+    GridBase * _grid;
+    Geometry _geom;
+    CartesianStencil<SiteSpinor, SiteSpinor> _stencil;
+    std::vector<LinkField> _Y; // Y = Kate's notation. TODO: With the TwoSpin policy, we could also have a Lattice<...> like in the Dirac operators
+
+    /////////////////////////////////////////////
+    // Member Functions
+    /////////////////////////////////////////////
+
+    CoarsenedMatrixUsingPolicies(GridCartesian &CoarseGrid)
+      : _grid(&CoarseGrid)
+      , _geom(CoarseGrid._ndimension)
+      , _stencil(&CoarseGrid, _geom.npoint, Even, _geom.directions, _geom.displacements)
+      , _Y(_geom.npoint, &CoarseGrid)
+    {
+      std::cout << GridLogMessage << "Called ctor of CoarsenedMatrixUsingPolicies using Policy " << CoarseningPolicy::name() << std::endl;
+    }
+
+    GridBase *Grid(void) { return _grid; };
+
+    RealD M(const FermionField &in, FermionField &out) {
+      conformable(_grid, in._grid);
+      conformable(in._grid, out._grid);
+
+      SimpleCompressor<SiteSpinor> compressor;
+      _stencil.HaloExchange(in, compressor);
+
+      parallel_for(int ss = 0; ss < Grid()->oSites(); ss++) {
+        SiteSpinor    res = zero;
+        SiteSpinor    nbr;
+        int           ptype;
+        StencilEntry *SE;
+        for(int point = 0; point < _geom.npoint; point++) {
+          SE = _stencil.GetEntry(ptype, point, ss);
+
+          if(SE->_is_local && SE->_permute) {
+            permute(nbr, in._odata[SE->_offset], ptype);
+          } else if(SE->_is_local) {
+            nbr = in._odata[SE->_offset];
+          } else {
+            nbr = _stencil.CommBuf()[SE->_offset];
+          }
+          res = res + _Y[point]._odata[ss] * nbr; // This could be changed to be similar to the Dirac operators with the TwoSpinPolicy
+        }
+        vstream(out._odata[ss], res);
+      }
+      return norm2(out);
+    }
+
+    RealD Mdag(const FermionField &in, FermionField &out) {
+      // TODO
+      return RealD();
+    }
+
+    void Mdiag(const FermionField &in, FermionField &out){ return Mdir(in, out, 0, 0); }
+
+    void Mdir(const FermionField &in, FermionField &out, int dir, int disp) {
+      conformable(Grid(), in._grid);
+      conformable(in._grid, out._grid);
+
+      SimpleCompressor<SiteSpinor> compressor;
+      _stencil.HaloExchange(in, compressor);
+
+      auto point = [dir, disp]() { // TODO: This is ugly and should be changed
+                     if(dir == 0 and disp == 0)
+                       return 8;
+                     else
+                       return (4 * dir + 1 - disp) / 2;
+                   }();
+
+      parallel_for(int ss = 0; ss < Grid()->oSites(); ss++) {
+        SiteSpinor    res = zero;
+        SiteSpinor    nbr;
+        int           ptype;
+        StencilEntry *SE;
+
+        SE = _stencil.GetEntry(ptype, point, ss);
+
+        if(SE->_is_local && SE->_permute) {
+          permute(nbr, in._odata[SE->_offset], ptype);
+        } else if(SE->_is_local) {
+          nbr = in._odata[SE->_offset];
+        } else {
+          nbr = _stencil.CommBuf()[SE->_offset];
+        }
+
+        res = res + _Y[point]._odata[ss] * nbr; // This could be changed to be similar to the Dirac operators with the TwoSpinPolicy
+
+        vstream(out._odata[ss], res);
+      }
+    }
+
+    // NOTE: Do this temporarily as I can't put everything into the Policies (since it can't have Aggregation as a parameter)
+    template<bool isTwoSpinVersion, typename std::enable_if<isTwoSpinVersion == false>::type * = nullptr>
+    void doOperatorCoarsening(GridBase *FineGrid, LinearOperatorBase<FineFermionField> &linop, AggregationUsingPolicies<CoarseningPolicy> &Aggregates) {
+      std::map<std::string, GridPerfMonitor> PerfMonitors {
+                                                           {"Total" , GridPerfMonitor()},
+                                                           {"Misc" , GridPerfMonitor()},
+                                                           {"Orthogonalise" , GridPerfMonitor()},
+                                                           {"Copy" , GridPerfMonitor()},
+                                                           {"LatticeCoord" , GridPerfMonitor()},
+                                                           {"ApplyOp" , GridPerfMonitor()},
+                                                           {"PickBlocks" , GridPerfMonitor()},
+                                                           {"ProjectToSubspace" , GridPerfMonitor()},
+                                                           {"ConstructLinks" , GridPerfMonitor()}
+                                                           };
+
+      PerfMonitors["Total"].Start();
+      PerfMonitors["Misc"].Start();
+
+      FineFermionField iblock(FineGrid); // contributions from within this block
+      FineFermionField oblock(FineGrid); // contributions from outwith this block
+
+      FineFermionField phi(FineGrid);
+      FineFermionField tmp(FineGrid);
+      FineFermionField zz(FineGrid); zz = zero;
+      FineFermionField Mphi(FineGrid);
+
+      Lattice<iScalar<vInteger>> coor(FineGrid);
+
+      FermionField iProj(Grid());
+      FermionField oProj(Grid());
+      ScalarField InnerProd(Grid());
+      PerfMonitors["Misc"].Stop();
+
+      PerfMonitors["Orthogonalise"].Start();
+      // Orthogonalise the subblocks over the basis
+      // Aggregates.Orthogonalise();
+      PerfMonitors["Orthogonalise"].Stop();
+
+      PerfMonitors["Misc"].Start();
+      // Compute the matrix elements of linop between this orthonormal
+      // set of vectors.
+      int self_stencil = -1;
+      for(int p = 0; p < _geom.npoint; p++) {
+        _Y[p] = zero;
+        if(_geom.displacements[p] == 0) {
+          self_stencil = p;
+        }
+      }
+      assert(self_stencil != -1);
+      PerfMonitors["Misc"].Stop();
+
+      for(int i = 0; i < Nbasis; i++) {
+        PerfMonitors["Copy"].Start();
+        phi = Aggregates._subspace[i];
+        PerfMonitors["Copy"].Stop();
+
+        std::cout << GridLogMessage << "(" << i << ") .." << std::endl;
+
+        for(int p = 0; p < _geom.npoint; p++) {
+
+          PerfMonitors["Misc"].Start();
+          int dir  = _geom.directions[p];
+          int disp = _geom.displacements[p];
+
+          Integer block = (FineGrid->_rdimensions[dir]) / (Grid()->_rdimensions[dir]);
+          PerfMonitors["Misc"].Stop();
+
+          PerfMonitors["LatticeCoord"].Start();
+          LatticeCoordinate(coor, dir);
+          PerfMonitors["LatticeCoord"].Stop();
+
+          PerfMonitors["ApplyOp"].Start();
+          // This paragraph is specific to the two spin version
+          if(disp == 0) {
+            linop.OpDiag(phi, Mphi);
+          } else {
+            linop.OpDir(phi, Mphi, dir, disp);
+          }
+          PerfMonitors["ApplyOp"].Stop();
+
+          ////////////////////////////////////////////////////////////////////////
+          // Pick out contributions coming from this cell and neighbour cell
+          ////////////////////////////////////////////////////////////////////////
+          PerfMonitors["PickBlocks"].Start();
+          if(disp == 0) {
+            iblock = Mphi;
+            oblock = zero;
+          } else if(disp == 1) {
+            oblock = where(mod(coor, block) == (block - 1), Mphi, zz);
+            iblock = where(mod(coor, block) != (block - 1), Mphi, zz);
+          } else if(disp == -1) {
+            oblock = where(mod(coor, block) == (Integer)0, Mphi, zz);
+            iblock = where(mod(coor, block) != (Integer)0, Mphi, zz);
+          } else {
+            assert(0);
+          }
+          PerfMonitors["PickBlocks"].Stop();
+
+          PerfMonitors["ProjectToSubspace"].Start();
+          Aggregates.ProjectToSubspace(iProj, iblock);
+          Aggregates.ProjectToSubspace(oProj, oblock);
+          PerfMonitors["ProjectToSubspace"].Stop(2);
+
+          PerfMonitors["ConstructLinks"].Start();
+          // This paragraph is specific to the two spin version
+          parallel_for(int ss = 0; ss < Grid()->oSites(); ss++) {
+            for(int j = 0; j < Nbasis; j++) {
+              if(disp != 0) {
+                _Y[p]._odata[ss](j, i) = oProj._odata[ss](j);
+              }
+              _Y[self_stencil]._odata[ss](j, i) = _Y[self_stencil]._odata[ss](j, i) + iProj._odata[ss](j);
+            }
+          }
+          PerfMonitors["ConstructLinks"].Stop();
+        }
+      }
+      PerfMonitors["Total"].Stop();
+      std::cout << GridLogMessage << "***************************************************************************" << std::endl;
+      std::cout << GridLogMessage << "Time breakdown for CoarsenOperator with isTwoSpinVersion == false" << std::endl;
+      std::cout << GridLogMessage << "***************************************************************************" << std::endl;
+      printPerformanceMonitors(PerfMonitors);
+    }
+
+    template <bool isTwoSpinVersion, typename std::enable_if<isTwoSpinVersion == true>::type *  = nullptr>
+    void extractChiralComponents(std::vector<FineFermionField> &extracted, FineFermionField const &in) {
+      auto len = 2; // TODO: This should either be Ncs or Nsb, not a hard-coded 2
+      assert(extracted.size() == len);
+
+      for(int k = 0; k < len; k++)
+        conformable(in._grid, extracted[k]._grid);
+
+      for(int k = 0; k < len; k++) extracted[k] = zero;
+
+#define SpinIndex 1 // Need to do this temporarily, will be removed once the QCD namespace is gone
+      parallel_for(int ss = 0; ss < in._grid->oSites(); ss++) {
+        for(int s = 0; s < Nfs; s++) {
+          auto tmp = peekIndex<SpinIndex>(in._odata[ss], s);
+            pokeIndex<SpinIndex>(extracted[s/Nsb]._odata[ss], tmp, s);
+        }
+      }
+#undef SpinIndex
+    }
+
+    template<bool isTwoSpinVersion, typename std::enable_if<isTwoSpinVersion == true>::type *  = nullptr>
+    void doOperatorCoarsening(GridBase *FineGrid, LinearOperatorBase<FineFermionField> &linop, AggregationUsingPolicies<CoarseningPolicy> &Aggregates) {
+      std::map<std::string, GridPerfMonitor> PerfMonitors {
+                                                           {"Total" , GridPerfMonitor()},
+                                                           {"Misc" , GridPerfMonitor()},
+                                                           {"Orthogonalise" , GridPerfMonitor()},
+                                                           {"Copy" , GridPerfMonitor()},
+                                                           {"LatticeCoord" , GridPerfMonitor()},
+                                                           {"ApplyOp" , GridPerfMonitor()},
+                                                           {"PickBlocks" , GridPerfMonitor()},
+                                                           {"ProjectToSubspace" , GridPerfMonitor()},
+                                                           {"ConstructLinks" , GridPerfMonitor()}
+      };
+
+      PerfMonitors["Total"].Start();
+      PerfMonitors["Misc"].Start();
+
+      auto len = 2; // TODO: This should either be Ncs or Nsb, not a hard-coded 2
+      std::vector<FineFermionField> iblockSplit(len, FineGrid);
+      std::vector<FineFermionField> oblockSplit(len, FineGrid);
+
+      FineFermionField phi(FineGrid);
+      std::vector<FineFermionField> phiSplit(len, FineGrid);
+      FineFermionField tmp(FineGrid);
+      FineFermionField zz(FineGrid); zz = zero;
+      std::vector<FineFermionField> MphiSplit(len, FineGrid);
+
+      Lattice<iScalar<vInteger>> coor(FineGrid);
+
+      std::vector<FermionField> iProjSplit(len, Grid());
+      std::vector<FermionField> oProjSplit(len, Grid());
+      PerfMonitors["Misc"].Stop();
+
+      PerfMonitors["Orthogonalise"].Start();
+      // // Orthogonalise the subblocks over the basis
+      // Aggregates.Orthogonalise();
+      PerfMonitors["Orthogonalise"].Stop();
+
+      PerfMonitors["Misc"].Start();
+      // Compute the matrix elements of linop between this orthonormal
+      // set of vectors.
+      int self_stencil = -1;
+      for(int p = 0; p < _geom.npoint; p++) {
+        _Y[p] = zero;
+        if(_geom.displacements[p] == 0) {
+          self_stencil = p;
+        }
+      }
+      assert(self_stencil != -1);
+      PerfMonitors["Misc"].Stop();
+
+      for(int i = 0; i < Nbasis; i++) {
+        PerfMonitors["Copy"].Start();
+        extractChiralComponents<isTwoSpinVersion>(phiSplit, Aggregates._subspace[i]);
+        PerfMonitors["Copy"].Stop();
+
+        std::cout << GridLogMessage << "(" << i << ") .." << std::endl;
+
+        for(int p = 0; p < _geom.npoint; p++) {
+
+          PerfMonitors["Misc"].Start();
+          int dir  = _geom.directions[p];
+          int disp = _geom.displacements[p];
+
+          Integer block = (FineGrid->_rdimensions[dir]) / (Grid()->_rdimensions[dir]);
+          PerfMonitors["Misc"].Stop();
+
+          PerfMonitors["LatticeCoord"].Start();
+          LatticeCoordinate(coor, dir);
+          PerfMonitors["LatticeCoord"].Stop();
+
+          PerfMonitors["ApplyOp"].Start();
+          if(disp == 0) {
+            for(int k = 0; k < len; k++)
+              linop.OpDiag(phiSplit[k], MphiSplit[k]);
+            // linop.OpDiag(phiUpper, MphiUpper);
+            // linop.OpDiag(phiLower, MphiLower);
+          } else {
+            for(int k = 0; k < len; k++)
+              linop.OpDir(phiSplit[k], MphiSplit[k], dir, disp);
+            // linop.OpDir(phiUpper, MphiUpper, dir, disp);
+            // linop.OpDir(phiLower, MphiLower, dir, disp);
+          }
+          PerfMonitors["ApplyOp"].Stop();
+
+          ////////////////////////////////////////////////////////////////////////
+          // Pick out contributions coming from this cell and neighbour cell
+          ////////////////////////////////////////////////////////////////////////
+          PerfMonitors["PickBlocks"].Start();
+          if(disp == 0) {
+            iblockSplit = MphiSplit;
+            for(int k = 0; k < len; k++) oblockSplit[k] = zero;
+            // iblockUpper = MphiUpper;
+            // iblockLower = MphiLower;
+            // oblockUpper = zero;
+            // oblockLower = zero;
+          } else if(disp == 1) {
+            for(int k = 0; k < len; k++) {
+              oblockSplit[k] = where(mod(coor, block) == (block - 1), MphiSplit[k], zz);
+              iblockSplit[k] = where(mod(coor, block) != (block - 1), MphiSplit[k], zz);
+            }
+            // oblockUpper = where(mod(coor, block) == (block - 1), MphiUpper, zz);
+            // oblockLower = where(mod(coor, block) == (block - 1), MphiLower, zz);
+            // iblockUpper = where(mod(coor, block) != (block - 1), MphiUpper, zz);
+            // iblockLower = where(mod(coor, block) != (block - 1), MphiLower, zz);
+          } else if(disp == -1) {
+            for(int k = 0; k < len; k++) {
+              oblockSplit[k] = where(mod(coor, block) == (Integer)0, MphiSplit[k], zz);
+              iblockSplit[k] = where(mod(coor, block) != (Integer)0, MphiSplit[k], zz);
+            }
+            // oblockUpper = where(mod(coor, block) == (Integer)0, MphiUpper, zz);
+            // oblockLower = where(mod(coor, block) == (Integer)0, MphiLower, zz);
+            // iblockUpper = where(mod(coor, block) != (Integer)0, MphiUpper, zz);
+            // iblockLower = where(mod(coor, block) != (Integer)0, MphiLower, zz);
+          } else {
+            assert(0);
+          }
+          PerfMonitors["PickBlocks"].Stop();
+
+          PerfMonitors["ProjectToSubspace"].Start();
+          for(int k = 0; k < len; k++) {
+            Aggregates.ProjectToSubspace(iProjSplit[k], iblockSplit[k]);
+            Aggregates.ProjectToSubspace(oProjSplit[k], oblockSplit[k]);
+          }
+          PerfMonitors["ProjectToSubspace"].Stop(len*2);
+
+          PerfMonitors["ConstructLinks"].Start();
+          parallel_for(int ss = 0; ss < Grid()->oSites(); ss++) {
+            for(int j = 0; j < Nbasis; j++) {
+              if(disp != 0) {
+                for(int k = 0; k < len; k++)
+                  for(int l = 0; l < len; l++)
+                    _Y[p]._odata[ss]()(l, k)(j, i) = oProjSplit[k]._odata[ss]()(l)(j);
+                // _Y[p]._odata[ss]()(0, 0)(j, i) = oProjUpper._odata[ss]()(0)(j);
+                // _Y[p]._odata[ss]()(1, 0)(j, i) = oProjUpper._odata[ss]()(1)(j);
+                // _Y[p]._odata[ss]()(0, 1)(j, i) = oProjLower._odata[ss]()(0)(j);
+                // _Y[p]._odata[ss]()(1, 1)(j, i) = oProjLower._odata[ss]()(1)(j);
+              }
+              for(int k = 0; k < len; k++)
+                for(int l = 0; l < len; l++)
+                  _Y[self_stencil]._odata[ss]()(l, k)(j, i) = _Y[self_stencil]._odata[ss]()(l, k)(j, i) + iProjSplit[k]._odata[ss]()(l)(j);
+              // _Y[self_stencil]._odata[ss]()(0, 0)(j, i) = _Y[self_stencil]._odata[ss]()(0, 0)(j, i) + iProjUpper._odata[ss]()(0)(j);
+              // _Y[self_stencil]._odata[ss]()(1, 0)(j, i) = _Y[self_stencil]._odata[ss]()(1, 0)(j, i) + iProjUpper._odata[ss]()(1)(j);
+              // _Y[self_stencil]._odata[ss]()(0, 1)(j, i) = _Y[self_stencil]._odata[ss]()(0, 1)(j, i) + iProjLower._odata[ss]()(0)(j);
+              // _Y[self_stencil]._odata[ss]()(1, 1)(j, i) = _Y[self_stencil]._odata[ss]()(1, 1)(j, i) + iProjLower._odata[ss]()(1)(j);
+            }
+          }
+          PerfMonitors["ConstructLinks"].Stop();
+        }
+      }
+      PerfMonitors["Total"].Stop();
+      std::cout << GridLogMessage << "***************************************************************************" << std::endl;
+      std::cout << GridLogMessage << "Time breakdown for CoarsenOperator with isTwoSpinVersion == true" << std::endl;
+      std::cout << GridLogMessage << "***************************************************************************" << std::endl;
+      printPerformanceMonitors(PerfMonitors);
+    }
+
+    void CoarsenOperator(GridBase *FineGrid, LinearOperatorBase<FineFermionField> &linop, AggregationUsingPolicies<CoarseningPolicy> &Aggregates) {
+      doOperatorCoarsening<CoarseningPolicy::isTwoSpinVersion>(FineGrid, linop, Aggregates);
+    }
+  };
+
+  //////////////////////////////////////////////////////////////////////////////////////////
+  // Original implementations
+  //////////////////////////////////////////////////////////////////////////////////////////
+
+
   template<class Fobj,class CComplex,int nbasis>
   class Aggregation   {
   public:
@@ -105,19 +852,15 @@ namespace Grid {
     std::vector<Lattice<Fobj> > subspace;
     int checkerboard;
 
-    std::map<std::string, GridStopWatch> Timers;
+    TimeProfiler timers;
 
   Aggregation(GridBase *_CoarseGrid,GridBase *_FineGrid,int _checkerboard) : 
     CoarseGrid(_CoarseGrid),
       FineGrid(_FineGrid),
       subspace(nbasis,_FineGrid),
-      checkerboard(_checkerboard)
-	{
-          Timers.emplace("Total", GridStopWatch());
-          Timers.emplace("Orthogonalise", GridStopWatch());
-          Timers.emplace("CreateVectors", GridStopWatch());
-          ResetTimers();
-	};
+      checkerboard(_checkerboard),
+      timers("Aggregation.CreateSubspace", {"Orthogonalise", "CreateVectors"})
+	{};
   
     void Orthogonalise(void){
       CoarseScalar InnerProd(CoarseGrid); 
@@ -154,7 +897,8 @@ namespace Grid {
 	random(RNG,subspace[i]);
 	std::cout<<GridLogMessage<<" norm subspace["<<i<<"] "<<norm2(subspace[i])<<std::endl;
       }
-      Orthogonalise();
+      Orthogonalise()
+;
     }
 
     /*
@@ -209,20 +953,23 @@ namespace Grid {
     */
     virtual void CreateSubspace(GridParallelRNG  &RNG,LinearOperatorBase<FineField> &hermop,int nn=nbasis) {
 
-      Timers["Total"].Start();
-      Timers["CreateVectors"].Start();
+      timers["Total"].Start();
+      timers["CreateVectors"].Start();
       RealD scale;
 
       ConjugateGradient<FineField> CG(1.0e-2,10000);
       FineField noise(FineGrid);
       FineField Mn(FineGrid);
 
+
       for(int b=0;b<nn;b++){
-	
+
+        timers["uiae"].Start();
 	subspace[b] = zero;
 	gaussian(RNG,noise);
 	scale = std::pow(norm2(noise),-0.5); 
 	noise=noise*scale;
+        timers["uiae"].Stop();
 
 	hermop.Op(noise,Mn); std::cout<<GridLogMessage << "noise   ["<<b<<"] <n|MdagM|n> "<<norm2(Mn)<<std::endl;
 
@@ -240,29 +987,17 @@ namespace Grid {
 	subspace[b]   = noise;
 
       }
-      Timers["CreateVectors"].Stop();
+      timers["CreateVectors"].Stop();
 
-      Timers["Orthogonalise"].Start();
+      timers["Orthogonalise"].Start();
       Orthogonalise();
-      Timers["Orthogonalise"].Stop();
+      timers["Orthogonalise"].Stop();
 
-      Timers["Total"].Stop();
-    }
-
-    void ResetTimers() {
-      for(auto &elem : Timers)
-        elem.second.Reset();
-    }
-
-    void ReportTimings() {
-      double timeTotal = Timers["Total"].useconds();
-      for(auto &elem : Timers) {
-        double timeElem = elem.second.useconds();
-        std::cout << GridLogMG << "Time elapsed: Aggregation.CreateSubspace -- " << elem.first << " " << elem.second.Elapsed()
-                  << " (" << std::defaultfloat << timeElem / timeTotal * 100 << "%)" << std::endl;
-      }
+      timers["Total"].Stop();
     }
   };
+
+
   // Fine Object == (per site) type of fine field
   // nbasis      == number of deflation vectors
   template<class Fobj,class CComplex,int nbasis>
@@ -285,8 +1020,29 @@ namespace Grid {
 
     std::vector<CoarseMatrix> A;
 
-    std::map<std::string, GridStopWatch> Timers;
+    TimeProfiler timers;
 
+    double tM;
+    double tMdag;
+    double tMdir;
+    double tmDiag;
+    double tCoarsenOperator;
+
+    double fM;
+    double fMdag;
+    double fMdir;
+    double fmDiag;
+    double fCoarsenOperator;
+
+    double bM;
+    double bMdag;
+    double bMdir;
+    double bmDiag;
+    double bCoarsenOperator;
+
+    ///////////////////////
+    ///////////////////////
+    ///////////////////////
     ///////////////////////
     // Interface
     ///////////////////////
@@ -381,24 +1137,14 @@ namespace Grid {
       _grid(&CoarseGrid),
       geom(CoarseGrid._ndimension),
       Stencil(&CoarseGrid,geom.npoint,Even,geom.directions,geom.displacements),
-      A(geom.npoint,&CoarseGrid)
-    {
-      Timers.emplace("Total", GridStopWatch());
-      Timers.emplace("Misc", GridStopWatch());
-      Timers.emplace("Copy", GridStopWatch());
-      Timers.emplace("LatticeCoordinate", GridStopWatch());
-      Timers.emplace("Orthogonalise", GridStopWatch());
-      Timers.emplace("ApplyOperator", GridStopWatch());
-      Timers.emplace("PickBlocks", GridStopWatch());
-      Timers.emplace("Restriction", GridStopWatch());
-      Timers.emplace("LinkConstruction", GridStopWatch());
-      ResetTimers();
-    };
+      A(geom.npoint,&CoarseGrid),
+      timers("CoarsenedMatrix.CoarsenOperator", {"Total", "Misc", "Copy", "LatticeCoordinate", "Orthogonalise", "ApplyOperator", "PickBlocks", "Restriction", "LinkConstruction"})
+    {};
 
     void CoarsenOperator(GridBase *FineGrid,LinearOperatorBase<Lattice<Fobj> > &linop,
 			 Aggregation<Fobj,CComplex,nbasis> & Subspace){
-      Timers["Total"].Start();
-      Timers["Misc"].Start();
+      timers["Total"].Start();
+      timers["Misc"].Start();
       FineField iblock(FineGrid); // contributions from within this block
       FineField oblock(FineGrid); // contributions from outwith this block
 
@@ -412,14 +1158,14 @@ namespace Grid {
       CoarseVector iProj(Grid()); 
       CoarseVector oProj(Grid()); 
       CoarseScalar InnerProd(Grid()); 
-      Timers["Misc"].Stop();
+      timers["Misc"].Stop();
 
-      Timers["Orthogonalise"].Start();
+      timers["Orthogonalise"].Start();
       // Orthogonalise the subblocks over the basis
       blockOrthogonalise(InnerProd,Subspace.subspace);
-      Timers["Orthogonalise"].Stop();
+      timers["Orthogonalise"].Stop();
 
-      Timers["Misc"].Start();
+      timers["Misc"].Start();
       // Compute the matrix elements of linop between this orthonormal
       // set of vectors.
       int self_stencil=-1;
@@ -430,41 +1176,41 @@ namespace Grid {
 	}
       }
       assert(self_stencil!=-1);
-      Timers["Misc"].Stop();
+      timers["Misc"].Stop();
 
       for(int i=0;i<nbasis;i++){
-        Timers["Copy"].Start();
+        timers["Copy"].Start();
 	phi=Subspace.subspace[i];
-        Timers["Copy"].Stop();
+        timers["Copy"].Stop();
 	
 	std::cout<<GridLogMessage<<"("<<i<<").."<<std::endl;
 
 	for(int p=0;p<geom.npoint;p++){ 
 
-          Timers["Misc"].Start();
+          timers["Misc"].Start();
 	  int dir   = geom.directions[p];
 	  int disp  = geom.displacements[p];
 
 	  Integer block=(FineGrid->_rdimensions[dir])/(Grid()->_rdimensions[dir]);
-          Timers["Misc"].Stop();
+          timers["Misc"].Stop();
 
-          Timers["LatticeCoordinate"].Start();
+          timers["LatticeCoordinate"].Start();
 	  LatticeCoordinate(coor,dir);
-          Timers["LatticeCoordinate"].Stop();
+          timers["LatticeCoordinate"].Stop();
 
-          Timers["ApplyOperator"].Start();
+          timers["ApplyOperator"].Start();
 	  if ( disp==0 ){
 	    linop.OpDiag(phi,Mphi);
 	  }
 	  else  {
 	    linop.OpDir(phi,Mphi,dir,disp); 
 	  }
-          Timers["ApplyOperator"].Stop();
+          timers["ApplyOperator"].Stop();
 
 	  ////////////////////////////////////////////////////////////////////////
 	  // Pick out contributions coming from this cell and neighbour cell
 	  ////////////////////////////////////////////////////////////////////////
-          Timers["PickBlocks"].Start();
+          timers["PickBlocks"].Start();
 	  if ( disp==0 ) {
 	    iblock = Mphi;
 	    oblock = zero;
@@ -477,16 +1223,16 @@ namespace Grid {
 	  } else {
 	    assert(0);
 	  }
-          Timers["PickBlocks"].Stop();
+          timers["PickBlocks"].Stop();
 
-          Timers["Restriction"].Start();
+          timers["Restriction"].Start();
 	  Subspace.ProjectToSubspace(iProj,iblock);
 	  Subspace.ProjectToSubspace(oProj,oblock);
 	  //	  blockProject(iProj,iblock,Subspace.subspace);
 	  //	  blockProject(oProj,oblock,Subspace.subspace);
-          Timers["Restriction"].Stop();
+          timers["Restriction"].Stop();
 
-          Timers["LinkConstruction"].Start();
+          timers["LinkConstruction"].Start();
 	  parallel_for(int ss=0;ss<Grid()->oSites();ss++){
 	    for(int j=0;j<nbasis;j++){
 	      if( disp!= 0 ) {
@@ -495,7 +1241,7 @@ namespace Grid {
 	      A[self_stencil]._odata[ss](j,i) =	A[self_stencil]._odata[ss](j,i) + iProj._odata[ss](j);
 	    }
 	  }
-          Timers["LinkConstruction"].Stop();
+          timers["LinkConstruction"].Stop();
 	}
       }
 
@@ -523,7 +1269,7 @@ namespace Grid {
       //      ForceHermitian();
       // AssertHermitian();
       // ForceDiagonal();
-      Timers["Total"].Stop();
+      timers["Total"].Stop();
     }
     void ForceDiagonal(void) {
 
@@ -577,20 +1323,6 @@ namespace Grid {
       Diff = A[8] - adj(A[8]);
       std::cout<<GridLogMessage<<"Norm diff local "<< norm2(Diff)<<std::endl;
       std::cout<<GridLogMessage<<"Norm local "<< norm2(A[8])<<std::endl;
-    }
-
-    void ResetTimers() {
-      for(auto &elem : Timers)
-        elem.second.Reset();
-    }
-
-    void ReportTimings() {
-      double timeTotal = Timers["Total"].useconds();
-      for(auto &elem : Timers) {
-        double timeElem = elem.second.useconds();
-        std::cout << GridLogMG << "Time elapsed: CoarsenedMatrix.CoarsenOperator -- " << elem.first << " " << elem.second.Elapsed()
-                  << " (" << std::defaultfloat << timeElem / timeTotal * 100 << "%)" << std::endl;
-      }
     }
 
   };
