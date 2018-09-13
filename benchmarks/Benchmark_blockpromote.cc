@@ -94,8 +94,8 @@ int main(int argc, char **argv) {
   auto FVolume = std::accumulate(FGrid->_fdimensions.begin(), FGrid->_fdimensions.end(), 1, std::multiplies<double>());
   auto CVolume = std::accumulate(CGrid->_fdimensions.begin(), CGrid->_fdimensions.end(), 1, std::multiplies<double>());
 
-  double flop      = (2 * FSiteVecElems * (nBasis - 1) + 6 * FSiteVecElems * nBasis) * FVolume;
-  double byte      = (1 * 1 + 3 * FSiteVecElems) * nBasis * FVolume * sizeof(Complex);
+  double flop      = (8 * (nBasis - 1) + 6) * FSiteVecElems * FVolume;
+  double byte      = ((1 * 1 + 3 * FSiteVecElems) * (nBasis - 1) + (1 * 1 + 2 * FSiteVecElems) * 1) * FVolume * sizeof(Complex);
 
   BenchmarkFunction(blockPromote, flop, byte, nIter, CoarseVec, FineVec, Aggs.subspace);
 
