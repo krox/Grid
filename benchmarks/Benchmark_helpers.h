@@ -32,26 +32,30 @@ namespace Grid {
 
 namespace BenchmarkHelpers {
 
-#define BenchmarkFunction(function, flop, byte, nIter, ...)                                \
-  do {                                                                                     \
-    GridPerfMonitor perfMonitor(flop, byte);                                               \
-    perfMonitor.Start();                                                                   \
-    for(int i = 0; i < nIter; ++i) {                                                       \
-      function(__VA_ARGS__);                                                               \
-    }                                                                                      \
-    perfMonitor.Stop(nIter);                                                               \
-    std::cout << GridLogPerformance << "Kernel "#function": " << perfMonitor << std::endl; \
+#define BenchmarkFunction(function, flop, byte, nIter, ...)     \
+  do {                                                          \
+    GridPerfMonitor perfMonitor(flop, byte);                    \
+    perfMonitor.Start();                                        \
+    for(int i = 0; i < nIter; ++i) {                            \
+      function(__VA_ARGS__);                                    \
+    }                                                           \
+    perfMonitor.Stop(nIter);                                    \
+    std::cout << GridLogPerformance << "Kernel "                \
+              << std::setw(25) << std::right                    \
+              << #function << ": " << perfMonitor << std::endl; \
   } while(0)
 
-#define BenchmarkExpression(expression, flop, byte, nIter)                                   \
-  do {                                                                                       \
-    GridPerfMonitor perfMonitor(flop, byte);                                                 \
-    perfMonitor.Start();                                                                     \
-    for(int i = 0; i < nIter; ++i) {                                                         \
-      expression;                                                                            \
-    }                                                                                        \
-    perfMonitor.Stop(nIter);                                                                 \
-    std::cout << GridLogPerformance << "Kernel "#expression": " << perfMonitor << std::endl; \
+#define BenchmarkExpression(expression, flop, byte, nIter)        \
+  do {                                                            \
+    GridPerfMonitor perfMonitor(flop, byte);                      \
+    perfMonitor.Start();                                          \
+    for(int i = 0; i < nIter; ++i) {                              \
+      expression;                                                 \
+    }                                                             \
+    perfMonitor.Stop(nIter);                                      \
+    std::cout << GridLogPerformance << "Kernel "                  \
+              << std::setw(25) << std::right                      \
+              << #expression << ": " << perfMonitor << std::endl; \
   } while(0)
 
 class KernelPerf {
