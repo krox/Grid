@@ -28,6 +28,8 @@
 #ifndef GRID_BENCHMARK_HELPERS_H
 #define GRID_BENCHMARK_HELPERS_H
 
+#include "Grid/util/Profiling.h"
+
 namespace Grid {
 
 namespace BenchmarkHelpers {
@@ -60,6 +62,33 @@ namespace BenchmarkHelpers {
     std::cout << GridLogPerformance << "Kernel "                  \
               << std::setw(25) << std::right                      \
               << #expression << ": " << perfMonitor << std::endl; \
+  } while(0)
+
+#define PerfProfileFunction(function, nIter, ...)                                         \
+  do {                                                                                    \
+    std::string kernelName = "kernel."#function;                                          \
+    std::string outputFile = kernelName + ".data";                                        \
+    System::profile(kernelName, [&]() {                                                   \
+      for(int i = 0; i < nIter; ++i) {                                                    \
+        function(__VA_ARGS__);                                                            \
+      }                                                                                   \
+    });                                                                                   \
+    std::cout << GridLogMessage << "Generated " << outputFile << std::endl;               \
+    std::cout << GridLogMessage << "Use with: perf report -i " << outputFile <<std::endl; \
+  } while(0)
+
+#define PerfProfileExpression(expression, nIter)                                          \
+  do {                                                                                    \
+    std::string kernelName = "kernel."#expression;                                        \
+    std::replace(kernelName.begin(), kernelName.end(), ' ', '_');                         \
+    std::string outputFile = kernelName + ".data";                                        \
+    System::profile(kernelName, [&]() {                                                   \
+      for(int i = 0; i < nIter; ++i) {                                                    \
+        expression;                                                                       \
+      }                                                                                   \
+    });                                                                                   \
+    std::cout << GridLogMessage << "Generated " << outputFile << std::endl;               \
+    std::cout << GridLogMessage << "Use with: perf report -i " << outputFile <<std::endl; \
   } while(0)
 
 class KernelPerf {
@@ -105,6 +134,15 @@ std::vector<int> readFromCommandLineIntVec(int *argc, char ***argv, const std::s
   if(GridCmdOptionExists(*argv, *argv + *argc, option)) {
     arg = GridCmdOptionPayload(*argv, *argv + *argc, option);
     GridCmdOptionIntVector(arg, ret);
+  }
+  return ret;
+}
+
+bool readFromCommandLineToggle(int *argc, char ***argv, const std::string &option) {
+  std::string arg;
+  bool ret = false;
+  if(GridCmdOptionExists(*argv, *argv + *argc, option)) {
+    ret = true;
   }
   return ret;
 }
