@@ -92,10 +92,11 @@ int main(int argc, char **argv) {
   std::vector<int> seeds({1, 2, 3, 4});
 
   // clang-format off
-  const int        nBasis    = NBASIS; static_assert((nBasis & 0x1) == 0, "");
-  const int        nb        = nBasis / 2;
-  int              nIter     = readFromCommandLineInt(&argc, &argv, "--niter", 10);
-  std::vector<int> blockSize = readFromCommandLineIntVec(&argc, &argv, "--blocksize", std::vector<int>({4, 4, 4, 4}));
+  const int        nBasis          = NBASIS; static_assert((nBasis & 0x1) == 0, "");
+  const int        nb              = nBasis / 2;
+  int              nIter           = readFromCommandLineInt(&argc, &argv, "--niter", 10);
+  std::vector<int> blockSize       = readFromCommandLineIntVec(&argc, &argv, "--blocksize", std::vector<int>({4, 4, 4, 4}));
+  bool             doPerfProfiling = readFromCommandLineToggle(&argc, &argv, "--perfprofiling");
   // clang-format on
 
   RealD mass = 0.5;
@@ -153,6 +154,11 @@ int main(int argc, char **argv) {
   auto absDev   = norm2(CoarseVecDiff);
   auto relDev   = absDev / norm2(CoarseVecOriginal);
   std::cout << GridLogMessage << "absolute deviation = " << absDev << " | relative deviation = " << relDev << std::endl;
+
+  if (doPerfProfiling) {
+    PerfProfileFunction(blockProjectOriginal, nIter, CoarseVecOriginal, FineVec, Aggs.subspace);
+    PerfProfileFunction(blockProject,         nIter, CoarseVec,         FineVec, Aggs.subspace);
+  }
 
   Grid_finalize();
 }

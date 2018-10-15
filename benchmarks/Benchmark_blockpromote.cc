@@ -46,10 +46,11 @@ int main(int argc, char **argv) {
   std::vector<int> seeds({1, 2, 3, 4});
 
   // clang-format off
-  const int        nBasis    = NBASIS; static_assert((nBasis & 0x1) == 0, "");
-  const int        nb        = nBasis / 2;
-  int              nIter     = readFromCommandLineInt(&argc, &argv, "--niter", 10);
-  std::vector<int> blockSize = readFromCommandLineIntVec(&argc, &argv, "--blocksize", std::vector<int>({4, 4, 4, 4}));
+  const int        nBasis          = NBASIS; static_assert((nBasis & 0x1) == 0, "");
+  const int        nb              = nBasis / 2;
+  int              nIter           = readFromCommandLineInt(&argc, &argv, "--niter", 10);
+  std::vector<int> blockSize       = readFromCommandLineIntVec(&argc, &argv, "--blocksize", std::vector<int>({4, 4, 4, 4}));
+  bool             doPerfProfiling = readFromCommandLineToggle(&argc, &argv, "--perfprofiling");
   // clang-format on
 
   RealD mass = 0.5;
@@ -98,6 +99,10 @@ int main(int argc, char **argv) {
   double byte      = ((1 * 1 + 3 * FSiteVecElems) * (nBasis - 1) + (1 * 1 + 2 * FSiteVecElems) * 1) * FVolume * sizeof(Complex);
 
   BenchmarkFunction(blockPromote, flop, byte, nIter, CoarseVec, FineVec, Aggs.subspace);
+
+  if (doPerfProfiling) {
+    PerfProfileFunction(blockPromote, nIter, CoarseVec, FineVec, Aggs.subspace);
+  }
 
   Grid_finalize();
 }

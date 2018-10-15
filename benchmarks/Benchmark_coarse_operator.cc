@@ -46,9 +46,10 @@ int main(int argc, char **argv) {
   std::vector<int> seeds({1, 2, 3, 4});
 
   // clang-format off
-  const int        nBasis    = NBASIS; static_assert((nBasis & 0x1) == 0, "");
-  const int        nb        = nBasis / 2;
-  int              nIter     = readFromCommandLineInt(&argc, &argv, "--niter", 10);
+  const int nBasis          = NBASIS; static_assert((nBasis & 0x1) == 0, "");
+  const int nb              = nBasis / 2;
+  int       nIter           = readFromCommandLineInt(&argc, &argv, "--niter", 10);
+  bool      doPerfProfiling = readFromCommandLineToggle(&argc, &argv, "--perfprofiling");
   // NB: blocksize not needed here, since we can use the --grid switch for the coarse grid directly
   // clang-format on
 
@@ -89,6 +90,13 @@ int main(int argc, char **argv) {
   BenchmarkFunction(CoarseMatrix.Mdag,  flopM,    byteM,    nIter, CoarseVecIn, CoarseVecOut); // TODO: with the current implementation of Mdag, this line is not correct
   BenchmarkFunction(CoarseMatrix.Mdir,  flopMdir, byteMdir, nIter, CoarseVecIn, CoarseVecOut, 2, 1);
   BenchmarkFunction(CoarseMatrix.Mdiag, flopMdir, byteMdir, nIter, CoarseVecIn, CoarseVecOut);
+
+  if (doPerfProfiling) {
+    PerfProfileFunction(CoarseMatrix.M,     nIter, CoarseVecIn, CoarseVecOut);
+    PerfProfileFunction(CoarseMatrix.Mdag,  nIter, CoarseVecIn, CoarseVecOut); // TODO: with the current implementation of Mdag, this line is not correct
+    PerfProfileFunction(CoarseMatrix.Mdir,  nIter, CoarseVecIn, CoarseVecOut, 2, 1);
+    PerfProfileFunction(CoarseMatrix.Mdiag, nIter, CoarseVecIn, CoarseVecOut);
+  }
 
   Grid_finalize();
 }
