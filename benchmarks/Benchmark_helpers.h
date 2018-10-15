@@ -37,7 +37,9 @@ namespace BenchmarkHelpers {
     GridPerfMonitor perfMonitor(flop, byte);                    \
     perfMonitor.Start();                                        \
     for(int i = 0; i < nIter; ++i) {                            \
+      __SSC_START;                                              \
       function(__VA_ARGS__);                                    \
+      __SSC_STOP;                                               \
     }                                                           \
     perfMonitor.Stop(nIter);                                    \
     std::cout << GridLogPerformance << "Kernel "                \
@@ -50,7 +52,9 @@ namespace BenchmarkHelpers {
     GridPerfMonitor perfMonitor(flop, byte);                      \
     perfMonitor.Start();                                          \
     for(int i = 0; i < nIter; ++i) {                              \
+      __SSC_START;                                                \
       expression;                                                 \
+      __SSC_STOP;                                                 \
     }                                                             \
     perfMonitor.Stop(nIter);                                      \
     std::cout << GridLogPerformance << "Kernel "                  \
