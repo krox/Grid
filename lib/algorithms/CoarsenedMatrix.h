@@ -1153,7 +1153,8 @@ namespace Grid {
       FineField     zz(FineGrid); zz=zero;
       FineField    Mphi(FineGrid);
 
-      Lattice<iScalar<vInteger> > coor(FineGrid);
+      std::vector<Lattice<iScalar<vInteger> > > coor(geom.npoint, FineGrid);
+      std::vector<Integer> block(geom.npoint, 0);
 
       CoarseVector iProj(Grid()); 
       CoarseVector oProj(Grid()); 
@@ -1174,9 +1175,16 @@ namespace Grid {
 	if( geom.displacements[p]==0){
 	  self_stencil=p;
 	}
+        block[p]=(FineGrid->_rdimensions[geom.directions[p]])/(Grid()->_rdimensions[geom.directions[p]]);
       }
       assert(self_stencil!=-1);
       timers["Misc"].Stop();
+
+      timers["LatticeCoordinate"].Start();
+      for(int p=0;p<geom.npoint;p++){
+        LatticeCoordinate(coor[p],geom.directions[p]);
+      }
+      timers["LatticeCoordinate"].Stop();
 
       for(int i=0;i<nbasis;i++){
         timers["Copy"].Start();
@@ -1215,11 +1223,11 @@ namespace Grid {
 	    iblock = Mphi;
 	    oblock = zero;
 	  } else if ( disp==1 ) {
-	    oblock = where(mod(coor,block)==(block-1),Mphi,zz);
-	    iblock = where(mod(coor,block)!=(block-1),Mphi,zz);
+	    oblock = where(mod(coor[p],block[p])==(block[p]-1),Mphi,zz);
+	    iblock = where(mod(coor[p],block[p])!=(block[p]-1),Mphi,zz);
 	  } else if ( disp==-1 ) {
-	    oblock = where(mod(coor,block)==(Integer)0,Mphi,zz);
-	    iblock = where(mod(coor,block)!=(Integer)0,Mphi,zz);
+	    oblock = where(mod(coor[p],block[p])==(Integer)0,Mphi,zz);
+	    iblock = where(mod(coor[p],block[p])!=(Integer)0,Mphi,zz);
 	  } else {
 	    assert(0);
 	  }
