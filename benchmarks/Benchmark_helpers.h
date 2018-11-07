@@ -91,33 +91,6 @@ namespace BenchmarkHelpers {
     std::cout << GridLogMessage << "Use with: perf report -i " << outputFile <<std::endl; \
   } while(0)
 
-class KernelPerf {
-public:
-  std::string name;
-  double flop;
-  double byte;
-  double intensity;
-  double footprint;
-
-  KernelPerf(const std::string &_name, double _flop, double _byte, double _footprint)
-    : name(_name)
-    , flop(_flop)
-    , byte(_byte)
-    , intensity(flop/byte)
-    , footprint(_footprint)
-  {}
-
-  void reportPerformance(double uSeconds, int nIter) {
-    double time = uSeconds / nIter / 1e6;
-    std::cout << GridLogMessage << std::scientific << "Kernel " << name << ":"
-              << " Intensity[F/B] = " << intensity
-              << " Time[s] = " << time
-              << " Perf[F/s] = " << flop / time
-              << " Traffic[B/s] = " << byte / time
-              << " Footprint[B] = " << footprint << std::endl;
-  }
-};
-
 int readFromCommandLineInt(int *argc, char ***argv, const std::string &option, int defaultValue) {
   std::string arg;
   int         ret = defaultValue;
