@@ -78,13 +78,13 @@ int main(int argc, char **argv) {
 
   auto CVolume = std::accumulate(CGrid->_fdimensions.begin(), CGrid->_fdimensions.end(), 1, std::multiplies<double>());
 
-  double flopM      = (nStencil * (8 * CSiteVecElems * CSiteVecElems - 2 * CSiteVecElems) + nAccum * 2 * CSiteVecElems) * CVolume + 8 * CSiteVecElems * CVolume;
-  double byteM      = (nStencil * (CSiteVecElems * CSiteVecElems + CSiteVecElems) + CSiteVecElems) * CVolume * sizeof(Complex) + CSiteVecElems * CVolume * sizeof(Complex);
-  double footprintM = (2 * CSiteVecElems + nStencil * CSiteVecElems * CSiteVecElems) * CVolume * sizeof(Complex);
+  double flopM      = 1. * (nStencil * (8 * CSiteVecElems * CSiteVecElems - 2 * CSiteVecElems) + nAccum * 2 * CSiteVecElems) * CVolume + 8 * CSiteVecElems * CVolume;
+  double byteM      = 1. * (nStencil * (CSiteVecElems * CSiteVecElems + CSiteVecElems) + CSiteVecElems) * CVolume * sizeof(Complex) + CSiteVecElems * CVolume * sizeof(Complex);
+  double footprintM = 1. * (2 * CSiteVecElems + nStencil * CSiteVecElems * CSiteVecElems) * CVolume * sizeof(Complex);
 
-  double flopMdir      = (8 * CSiteVecElems * CSiteVecElems - 2 * CSiteVecElems) * CVolume;
-  double byteMdir      = (CSiteVecElems * CSiteVecElems + 2 * CSiteVecElems) * CVolume * sizeof(Complex);
-  double footprintMdir = (2 * CSiteVecElems + nStencil * CSiteVecElems * CSiteVecElems) * CVolume * sizeof(Complex);
+  double flopMdir      = 1. * (8 * CSiteVecElems * CSiteVecElems - 2 * CSiteVecElems) * CVolume;
+  double byteMdir      = 1. * (CSiteVecElems * CSiteVecElems + 2 * CSiteVecElems) * CVolume * sizeof(Complex);
+  double footprintMdir = 1. * (2 * CSiteVecElems + nStencil * CSiteVecElems * CSiteVecElems) * CVolume * sizeof(Complex);
 
   BenchmarkFunction(CoarseMatrix.M,     flopM,    byteM,    nIter, CoarseVecIn, CoarseVecOut);
   BenchmarkFunction(CoarseMatrix.Mdag,  flopM,    byteM,    nIter, CoarseVecIn, CoarseVecOut); // TODO: with the current implementation of Mdag, this line is not correct
