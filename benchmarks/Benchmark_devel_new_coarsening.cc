@@ -81,17 +81,6 @@ convertOldLayoutToNewLayout(typename OldCoarsenedMatrix::LinkField const &oldFor
 }
 
 template<class Field>
-void printDeviationFromReference(Field const &reference, Field const& result) {
-  conformable(reference._grid, result._grid);
-  Field diff(reference._grid);
-
-  diff = reference - result;
-  auto absDev   = norm2(diff);
-  auto relDev   = absDev / norm2(reference);
-  std::cout << GridLogMessage << "absolute deviation = " << absDev << " | relative deviation = " << relDev << std::endl;
-}
-
-template<class Field>
 void printIndexRankInfo(std::string const &name) {
   typedef typename getVectorType<Field>::type vobj; // gives us the the type of the site object if it's a Lattice type
 

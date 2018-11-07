@@ -144,6 +144,17 @@ template<typename Field> void performChiralDoubling(std::vector<Field> &basisVec
   }
 }
 
+template<class Field>
+void printDeviationFromReference(Field const &reference, Field const& result) {
+  conformable(reference._grid, result._grid);
+  Field diff(reference._grid);
+
+  diff = reference - result;
+  auto absDev   = norm2(diff);
+  auto relDev   = absDev / norm2(reference);
+  std::cout << GridLogMessage << "absolute deviation = " << absDev << " | relative deviation = " << relDev << std::endl;
+}
+
 } // BenchmarkHelpers
 } // Grid
 
