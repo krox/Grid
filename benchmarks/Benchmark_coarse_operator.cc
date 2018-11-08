@@ -72,19 +72,19 @@ int main(int argc, char **argv) {
   random(CPRNG, CoarseVecIn);
   random(CPRNG, CoarseVecOut);
 
-  auto nStencil      = CoarseMatrix.geom.npoint;
-  auto nAccum        = nStencil;
-  auto CSiteVecElems = nBasis;
+  auto nStencil   = CoarseMatrix.geom.npoint;
+  auto nAccum     = nStencil;
+  auto CSiteElems = getSiteElems<decltype(CoarseVecIn)>();
 
   auto CVolume = std::accumulate(CGrid->_fdimensions.begin(), CGrid->_fdimensions.end(), 1, std::multiplies<double>());
 
-  double flopM      = 1. * (nStencil * (8 * CSiteVecElems * CSiteVecElems - 2 * CSiteVecElems) + nAccum * 2 * CSiteVecElems) * CVolume + 8 * CSiteVecElems * CVolume;
-  double byteM      = 1. * (nStencil * (CSiteVecElems * CSiteVecElems + CSiteVecElems) + CSiteVecElems) * CVolume * sizeof(Complex) + CSiteVecElems * CVolume * sizeof(Complex);
-  double footprintM = 1. * (2 * CSiteVecElems + nStencil * CSiteVecElems * CSiteVecElems) * CVolume * sizeof(Complex);
+  double flopM      = 1. * (nStencil * (8 * CSiteElems * CSiteElems - 2 * CSiteElems) + nAccum * 2 * CSiteElems) * CVolume + 8 * CSiteElems * CVolume;
+  double byteM      = 1. * (nStencil * (CSiteElems * CSiteElems + CSiteElems) + CSiteElems) * CVolume * sizeof(Complex) + CSiteElems * CVolume * sizeof(Complex);
+  double footprintM = 1. * (2 * CSiteElems + nStencil * CSiteElems * CSiteElems) * CVolume * sizeof(Complex);
 
-  double flopMdir      = 1. * (8 * CSiteVecElems * CSiteVecElems - 2 * CSiteVecElems) * CVolume;
-  double byteMdir      = 1. * (CSiteVecElems * CSiteVecElems + 2 * CSiteVecElems) * CVolume * sizeof(Complex);
-  double footprintMdir = 1. * (2 * CSiteVecElems + nStencil * CSiteVecElems * CSiteVecElems) * CVolume * sizeof(Complex);
+  double flopMdir      = 1. * (8 * CSiteElems * CSiteElems - 2 * CSiteElems) * CVolume;
+  double byteMdir      = 1. * (CSiteElems * CSiteElems + 2 * CSiteElems) * CVolume * sizeof(Complex);
+  double footprintMdir = 1. * (2 * CSiteElems + nStencil * CSiteElems * CSiteElems) * CVolume * sizeof(Complex);
 
   BenchmarkFunction(CoarseMatrix.M,     flopM,    byteM,    nIter, CoarseVecIn, CoarseVecOut);
   BenchmarkFunction(CoarseMatrix.Mdag,  flopM,    byteM,    nIter, CoarseVecIn, CoarseVecOut); // TODO: with the current implementation of Mdag, this line is not correct

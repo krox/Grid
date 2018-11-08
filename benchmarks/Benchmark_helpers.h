@@ -155,6 +155,41 @@ void printDeviationFromReference(Field const &reference, Field const& result) {
   std::cout << GridLogMessage << "absolute deviation = " << absDev << " | relative deviation = " << relDev << std::endl;
 }
 
+template<class vobj>
+int getSiteElems() {
+  int ret = 1;
+
+  typedef typename getVectorType<vobj>::type vobj_site; // gives us the the type of the site object if vobj is a Lattice type
+
+  // TODO: This doesn't work for arbitry tensors. One would need to get the tensor recursion depth and then walk over these and multiply the values
+
+  int _ColourN       = indexRank<ColourIndex,vobj_site>();
+  int _ColourScalar  =  isScalar<ColourIndex,vobj_site>();
+  int _ColourVector  =  isVector<ColourIndex,vobj_site>();
+  int _ColourMatrix  =  isMatrix<ColourIndex,vobj_site>();
+
+  int _SpinN         = indexRank<SpinIndex,vobj_site>();
+  int _SpinScalar    =  isScalar<SpinIndex,vobj_site>();
+  int _SpinVector    =  isVector<SpinIndex,vobj_site>();
+  int _SpinMatrix    =  isMatrix<SpinIndex,vobj_site>();
+
+  int _LorentzN      = indexRank<LorentzIndex,vobj_site>();
+  int _LorentzScalar =  isScalar<LorentzIndex,vobj_site>();
+  int _LorentzVector =  isVector<LorentzIndex,vobj_site>();
+  int _LorentzMatrix =  isMatrix<LorentzIndex,vobj_site>();
+
+  if (_ColourMatrix) ret *= _ColourN * _ColourN;
+  else               ret *= _ColourN;
+
+  if (_SpinMatrix) ret *= _SpinN * _SpinN;
+  else             ret *= _SpinN;
+
+  if (_LorentzMatrix) ret *= _LorentzN * _LorentzN;
+  else                ret *= _LorentzN;
+
+  return ret;
+}
+
 } // BenchmarkHelpers
 } // Grid
 
