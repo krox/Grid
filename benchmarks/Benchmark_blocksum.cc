@@ -2,7 +2,7 @@
 
     Grid physics library, www.github.com/paboyle/Grid
 
-    Source file: ./benchmarks/Benchmark_blockproject.cc
+    Source file: ./benchmarks/Benchmark_blocksum.cc
 
     Copyright (C) 2015 - 2018
 
@@ -35,51 +35,44 @@ using namespace Grid::BenchmarkHelpers;
 
 // Enable control of nbasis from the compiler command line
 // NOTE to self: Copy the value of CXXFLAGS from the makefile and call make as follows:
-//   make CXXFLAGS="-DNBASIS=24 VALUE_OF_CXXFLAGS_IN_MAKEFILE" Benchmark_blockproject
+//   make CXXFLAGS="-DNBASIS=24 VALUE_OF_CXXFLAGS_IN_MAKEFILE" Benchmark_blocksum
 #ifndef NBASIS
 #define NBASIS 32
 #endif
 
-template<class vobj,class CComplex,int nbasis>
-inline void blockProjectOriginal(Lattice<iVector<CComplex,nbasis > > &coarseData,
-                                 const             Lattice<vobj>   &fineData,
-                                 const std::vector<Lattice<vobj> > &Basis)
+template<class vobj>
+inline void blockSumOriginal(Lattice<vobj> &coarseData,const Lattice<vobj> &fineData)
 {
   GridBase * fine  = fineData._grid;
   GridBase * coarse= coarseData._grid;
-  int  _ndimension = coarse->_ndimension;
 
-  // checks
-  assert( nbasis == Basis.size() );
-  subdivides(coarse,fine);
-  for(int i=0;i<nbasis;i++){
-    conformable(Basis[i],fineData);
-  }
+  subdivides(coarse,fine); // require they map
+
+  int _ndimension = coarse->_ndimension;
 
   std::vector<int>  block_r      (_ndimension);
 
   for(int d=0 ; d<_ndimension;d++){
     block_r[d] = fine->_rdimensions[d] / coarse->_rdimensions[d];
-    assert(block_r[d]*coarse->_rdimensions[d] == fine->_rdimensions[d]);
   }
 
+  // Turn this around to loop threaded over sc and interior loop
+  // over sf would thread better
   coarseData=zero;
-
-  // Loop over coars parallel, and then loop over fine associated with coarse.
-  parallel_for(int sf=0;sf<fine->oSites();sf++){
+  parallel_region {
 
     int sc;
     std::vector<int> coor_c(_ndimension);
     std::vector<int> coor_f(_ndimension);
-    Lexicographic::CoorFromIndex(coor_f,sf,fine->_rdimensions);
-    for(int d=0;d<_ndimension;d++) coor_c[d]=coor_f[d]/block_r[d];
-    Lexicographic::IndexFromCoor(coor_c,sc,coarse->_rdimensions);
+
+    parallel_for_internal(int sf=0;sf<fine->oSites();sf++){
+
+      Lexicographic::CoorFromIndex(coor_f,sf,fine->_rdimensions);
+      for(int d=0;d<_ndimension;d++) coor_c[d]=coor_f[d]/block_r[d];
+      Lexicographic::IndexFromCoor(coor_c,sc,coarse->_rdimensions);
 
 PARALLEL_CRITICAL
-    for(int i=0;i<nbasis;i++) {
-
-      coarseData._odata[sc](i)=coarseData._odata[sc](i)
-	+ innerProduct(Basis[i]._odata[sf],fineData._odata[sf]);
+      coarseData._odata[sc]=coarseData._odata[sc]+fineData._odata[sf];
 
     }
   }
@@ -119,49 +112,48 @@ int main(int argc, char **argv) {
   FPRNG.SeedFixedIntegers(seeds);
   CPRNG.SeedFixedIntegers(seeds);
 
-  LatticeGaugeField Umu(FGrid);
-  SU3::HotConfiguration(FPRNG, Umu);
+  LatticeFermion FineX(FGrid);
+  LatticeFermion FineY(FGrid);
 
-  WilsonFermionR                                      Dw(Umu, *FGrid, *FrbGrid, mass);
-  MdagMLinearOperator<WilsonFermionR, LatticeFermion> MdagMOp(Dw);
+  random(FPRNG, FineX);
+  random(FPRNG, FineY);
 
-  Aggregates Aggs(CGrid, FGrid, 0);
-  Aggs.CreateSubspace(FPRNG, MdagMOp, nb);
-  performChiralDoubling(Aggs.subspace);
+  typedef decltype(innerProduct(FineX._odata[0], FineY._odata[0])) dotp;
 
-  LatticeFermion FineVec(FGrid);
-  CoarseVector   CoarseVec(CGrid);
-  CoarseVector   CoarseVecNew(CGrid);
-  CoarseVector   CoarseVecOriginal(CGrid);
-  CoarseVector   CoarseVecDiff(CGrid);
-  CoarseVecNew      = zero;
-  CoarseVec         = zero;
-  CoarseVecOriginal = zero;
+  Lattice<dotp> FineInner(FGrid); FineInner.checkerboard = FineX.checkerboard;
+  Lattice<dotp> CoarseInnerOriginal(CGrid);
+  Lattice<dotp> CoarseInnerNew2Args(CGrid);
+  Lattice<dotp> CoarseInnerNew3Args(CGrid);
+  CoarseInnerOriginal = zero;
+  CoarseInnerNew2Args = zero;
+  CoarseInnerNew3Args = zero;
 
-  random(FPRNG, FineVec);
+  FineInner = localInnerProduct(FineX, FineY);
 
-  auto FSiteElems = getSiteElems<decltype(FineVec)>();
-  auto CSiteElems = getSiteElems<decltype(CoarseVec)>();
+  auto FSiteElems = getSiteElems<decltype(FineInner)>();
+  auto CSiteElems = getSiteElems<decltype(CoarseInnerOriginal)>();
+
+  std::cout << FSiteElems << " " << CSiteElems << std::endl;
 
   auto FVolume = std::accumulate(FGrid->_fdimensions.begin(), FGrid->_fdimensions.end(), 1, std::multiplies<double>());
   auto CVolume = std::accumulate(CGrid->_fdimensions.begin(), CGrid->_fdimensions.end(), 1, std::multiplies<double>());
 
-  double flop = 1. * (8 * FSiteElems * nBasis * FVolume);
-  double byte = 1. * ((2 * 1 + 2 * FSiteElems) * nBasis * FVolume * sizeof(Complex));
+  double flop = 1. * (2 * FSiteElems * FVolume);
+  double byte = 1. * ((2 * CSiteElems + 1 * FSiteElems) * FVolume * sizeof(Complex));
 
   CoarseningLookUpTable lookUpTable(CGrid, FGrid);
 
-  BenchmarkFunction(blockProjectOriginal, flop, byte, nIter, CoarseVecOriginal, FineVec, Aggs.subspace);
-  BenchmarkFunction(blockProject,         flop, byte, nIter, CoarseVec,         FineVec, Aggs.subspace);
-  BenchmarkFunction(blockProject,         flop, byte, nIter, CoarseVecNew,      FineVec, Aggs.subspace, lookUpTable);
+  BenchmarkFunction(blockSumOriginal, flop, byte, nIter, CoarseInnerOriginal, FineInner);
+  BenchmarkFunction(blockSum,         flop, byte, nIter, CoarseInnerNew2Args, FineInner);
+  BenchmarkFunction(blockSum,         flop, byte, nIter, CoarseInnerNew3Args, FineInner, lookUpTable);
 
-  printDeviationFromReference(CoarseVecOriginal, CoarseVec);
-  printDeviationFromReference(CoarseVecOriginal, CoarseVecNew);
+  printDeviationFromReference(CoarseInnerOriginal, CoarseInnerNew2Args);
+  printDeviationFromReference(CoarseInnerOriginal, CoarseInnerNew3Args);
 
   if (doPerfProfiling) {
-    PerfProfileFunction(blockProjectOriginal, nIter, CoarseVecOriginal, FineVec, Aggs.subspace);
-    PerfProfileFunction(blockProject,         nIter, CoarseVec,         FineVec, Aggs.subspace);
-    PerfProfileFunction(blockProject,         nIter, CoarseVecNew,      FineVec, Aggs.subspace, lookUpTable);
+    PerfProfileFunction(blockSumOriginal, nIter, CoarseInnerOriginal, FineInner);
+    PerfProfileFunction(blockSum,         nIter, CoarseInnerNew2Args, FineInner);
+    PerfProfileFunction(blockSum,         nIter, CoarseInnerNew3Args, FineInner, lookUpTable);
   }
 
   Grid_finalize();

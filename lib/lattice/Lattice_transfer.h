@@ -30,6 +30,94 @@ Author: Peter Boyle <paboyle@ph.ed.ac.uk>
 
 namespace Grid {
 
+// With this class, we can get rid of the overhead of calculating the LookUpTable in every call to
+// blockProject and blockSum by keeping an instance of this class around in calling code, e.g., class Aggregation
+class CoarseningLookUpTable {
+private:
+  GridBase *                    _coarse;
+  GridBase *                    _fine;
+  bool                          _isPopulated;
+  std::vector<std::vector<int>> _lut;
+
+public:
+  CoarseningLookUpTable(GridBase *coarse, GridBase *fine)
+    : _coarse(coarse)
+    , _fine(fine)
+    , _isPopulated(false)
+    , _lut(_coarse->oSites()) {
+    populate(_coarse, _fine);
+  }
+
+  CoarseningLookUpTable() = delete;
+  CoarseningLookUpTable(const CoarseningLookUpTable &) = delete;
+  CoarseningLookUpTable & operator=(const CoarseningLookUpTable &) = delete;
+  CoarseningLookUpTable(CoarseningLookUpTable &&) = delete;
+  CoarseningLookUpTable & operator=(CoarseningLookUpTable &&) = delete;
+
+  inline const std::vector<std::vector<int>> & operator()()               const { return _lut; }
+  inline const             std::vector<int>  & operator()(int sc)         const { return _lut[sc]; }
+  inline                               int     operator()(int sc, int sf) const { return _lut[sc][sf]; }
+
+  bool isPopulated() const { return _isPopulated; }
+
+  bool gridPointersMatch(GridBase *coarse, GridBase *fine) const {
+    // NOTE: This is the same check that "conformable" does
+    bool ret = true;
+    if(_coarse != coarse)
+      ret = false;
+    if(_fine != fine)
+      ret = false;
+    return ret;
+  }
+
+  void setGridPointers(GridBase *coarse, GridBase *fine) {
+    _coarse = coarse;
+    _fine   = fine;
+  }
+
+  void populate(GridBase *coarse, GridBase *fine) {
+    if(gridPointersMatch(coarse, fine) && isPopulated()) {
+      // std::cout << GridLogMessage << "No recalculation needed. Skipping" << std::endl;
+      return;
+    } else {
+      // std::cout << GridLogMessage << "Recalculating Lookup table" << std::endl;
+      setGridPointers(coarse, fine);
+      populate();
+    }
+  }
+
+private:
+  void populate() {
+    int _ndimension = _coarse->_ndimension;
+    std::vector<int> block_r(_ndimension);
+    std::vector<int> coor_c(_ndimension);
+    std::vector<int> coor_f(_ndimension);
+    int sc{};
+
+    long unsigned int block_v = 1;
+    for(int d = 0; d < _ndimension; d++) {
+      block_r[d] = _fine->_rdimensions[d] / _coarse->_rdimensions[d];
+      assert(block_r[d] * _coarse->_rdimensions[d] == _fine->_rdimensions[d]);
+      block_v *= block_r[d];
+    }
+
+    _lut.resize(_coarse->oSites());
+    for (auto & elem : _lut) {
+      elem.resize(0);
+      elem.reserve(block_v);
+    }
+
+    // TODO: experiment if making this parallel with an omp critical is faster than this version
+    for(int sf = 0; sf < _fine->oSites(); sf++) {
+      Lexicographic::CoorFromIndex(coor_f, sf, _fine->_rdimensions);
+      for(int d = 0; d < _ndimension; d++) coor_c[d] = coor_f[d] / block_r[d];
+      Lexicographic::IndexFromCoor(coor_c, sc, _coarse->_rdimensions);
+      _lut[sc].push_back(sf);
+    }
+    _isPopulated = true;
+  }
+};
+
 inline void subdivides(GridBase *coarse,GridBase *fine)
 {
   assert(coarse->_ndimension == fine->_ndimension);
@@ -80,47 +168,39 @@ inline void subdivides(GridBase *coarse,GridBase *fine)
   }
   
 
+// Function overload to be able to support existing interface
+// However the function with only 3 arguments suffers from the
+// performance penalty of calculating the lookup table. The one
+// with 4 arguments is aimed at reusing the lookup table
 template<class vobj,class CComplex,int nbasis>
 inline void blockProject(Lattice<iVector<CComplex,nbasis > > &coarseData,
 			 const             Lattice<vobj>   &fineData,
 			 const std::vector<Lattice<vobj> > &Basis)
 {
-  GridBase * fine  = fineData._grid;
-  GridBase * coarse= coarseData._grid;
-  int  _ndimension = coarse->_ndimension;
+  CoarseningLookUpTable lookUpTable(coarseData._grid, fineData._grid);
+  blockProject(coarseData, fineData, Basis, lookUpTable);
+}
+template<class vobj,class CComplex,int nbasis>
+inline void blockProject(Lattice<iVector<CComplex,nbasis > > &coarseData,
+                         const             Lattice<vobj>     &fineData,
+                         const std::vector<Lattice<vobj> >   &Basis,
+                         const CoarseningLookUpTable         &lookUpTable)
+{
+  GridBase *fine   = fineData._grid;
+  GridBase *coarse = coarseData._grid;
 
-  // checks
-  assert( nbasis == Basis.size() );
-  subdivides(coarse,fine); 
-  for(int i=0;i<nbasis;i++){
-    conformable(Basis[i],fineData);
-  }
-
-  std::vector<int>  block_r      (_ndimension);
-  
-  for(int d=0 ; d<_ndimension;d++){
-    block_r[d] = fine->_rdimensions[d] / coarse->_rdimensions[d];
-    assert(block_r[d]*coarse->_rdimensions[d] == fine->_rdimensions[d]);
+  assert(lookUpTable.gridPointersMatch(coarse, fine));
+  assert(nbasis == Basis.size());
+  subdivides(coarse, fine);
+  for(int i = 0; i < nbasis; i++) {
+    conformable(Basis[i], fineData);
   }
 
   coarseData=zero;
-
-  std::vector<std::vector<int>> lookUpTable(coarse->oSites());
-
-  for(int sf = 0; sf < fine->oSites(); sf++) {
-    int sc;
-    std::vector<int> coor_c(_ndimension);
-    std::vector<int> coor_f(_ndimension);
-    Lexicographic::CoorFromIndex(coor_f, sf, fine->_rdimensions);
-    for(int d = 0; d < _ndimension; d++) coor_c[d] = coor_f[d] / block_r[d];
-    Lexicographic::IndexFromCoor(coor_c, sc, coarse->_rdimensions);
-    lookUpTable[sc].push_back(sf);
-  }
-
   // Thread over coarse sites so we can get rid of the critical region
   parallel_for(int sc = 0; sc < coarse->oSites(); sc++) {
     for(int i = 0; i < nbasis; i++) {
-      for(auto sf : lookUpTable[sc]) {
+      for(int sf : lookUpTable()[sc]) {
         coarseData._odata[sc](i) = coarseData._odata[sc](i) + innerProduct(Basis[i]._odata[sf], fineData._odata[sf]);
       }
     }
@@ -170,71 +250,72 @@ inline void blockZAXPY(Lattice<vobj> &fineZ,
 
   return;
 }
+
+// NOTE: No overload of this function, since it is not used outside this file
 template<class vobj,class CComplex>
-  inline void blockInnerProduct(Lattice<CComplex> &CoarseInner,
-				const Lattice<vobj> &fineX,
-				const Lattice<vobj> &fineY)
+inline void blockInnerProduct(Lattice<CComplex> &CoarseInner,
+                              const Lattice<vobj> &fineX,
+                              const Lattice<vobj> &fineY,
+                              const CoarseningLookUpTable &lookUpTable)
 {
   typedef decltype(innerProduct(fineX._odata[0],fineY._odata[0])) dotp;
 
   GridBase *coarse(CoarseInner._grid);
   GridBase *fine  (fineX._grid);
 
+  assert(lookUpTable.gridPointersMatch(coarse, fine));
+
   Lattice<dotp> fine_inner(fine); fine_inner.checkerboard = fineX.checkerboard;
   Lattice<dotp> coarse_inner(coarse);
 
   // Precision promotion?
   fine_inner = localInnerProduct(fineX,fineY);
-  blockSum(coarse_inner,fine_inner);
+  blockSum(coarse_inner,fine_inner,lookUpTable);
   parallel_for(int ss=0;ss<coarse->oSites();ss++){
     CoarseInner._odata[ss] = coarse_inner._odata[ss];
   }
 }
+
+// NOTE: No overload of this function, since it is not used outside this file
 template<class vobj,class CComplex>
-inline void blockNormalise(Lattice<CComplex> &ip,Lattice<vobj> &fineX)
+inline void blockNormalise(Lattice<CComplex> &ip,
+                           Lattice<vobj> &fineX,
+                           const CoarseningLookUpTable &lookUpTable)
 {
   GridBase *coarse = ip._grid;
+  assert(lookUpTable.gridPointersMatch(coarse, fineX._grid));
   Lattice<vobj> zz(fineX._grid); zz=zero; zz.checkerboard=fineX.checkerboard;
-  blockInnerProduct(ip,fineX,fineX);
+  blockInnerProduct(ip,fineX,fineX,lookUpTable);
   ip = pow(ip,-0.5);
   blockZAXPY(fineX,ip,fineX,zz);
 }
-// useful in multigrid project;
-// Generic name : Coarsen?
+
+// Function overload to be able to support existing interface
+// However the function with only 2 arguments suffers from the
+// performance penalty of calculating the lookup table. The one
+// with 3 arguments is aimed at reusing the lookup table
 template<class vobj>
 inline void blockSum(Lattice<vobj> &coarseData,const Lattice<vobj> &fineData)
 {
-  GridBase * fine  = fineData._grid;
-  GridBase * coarse= coarseData._grid;
+  CoarseningLookUpTable lookUpTable(coarseData._grid, fineData._grid);
+  blockSum(coarseData, fineData, lookUpTable);
+}
+template<class vobj>
+inline void blockSum(Lattice<vobj> &coarseData,
+                     const Lattice<vobj> &fineData,
+                     const CoarseningLookUpTable &lookUpTable)
+{
+  GridBase *fine   = fineData._grid;
+  GridBase *coarse = coarseData._grid;
+  subdivides(coarse, fine);
+  assert(lookUpTable.gridPointersMatch(coarse, fine));
 
-  subdivides(coarse,fine); // require they map
-
-  int _ndimension = coarse->_ndimension;
-  
-  std::vector<int>  block_r      (_ndimension);
-  
-  for(int d=0 ; d<_ndimension;d++){
-    block_r[d] = fine->_rdimensions[d] / coarse->_rdimensions[d];
-  }
-
-  // Turn this around to loop threaded over sc and interior loop 
-  // over sf would thread better
   coarseData=zero;
-  parallel_region {
 
-    int sc;
-    std::vector<int> coor_c(_ndimension);
-    std::vector<int> coor_f(_ndimension);
-
-    parallel_for_internal(int sf=0;sf<fine->oSites();sf++){
-    
-      Lexicographic::CoorFromIndex(coor_f,sf,fine->_rdimensions);
-      for(int d=0;d<_ndimension;d++) coor_c[d]=coor_f[d]/block_r[d];
-      Lexicographic::IndexFromCoor(coor_c,sc,coarse->_rdimensions);
-      
-PARALLEL_CRITICAL
+  // Thread over coarse sites so we can get rid of the critical region
+  parallel_for(int sc = 0; sc < coarse->oSites(); sc++) {
+    for(int sf : lookUpTable()[sc]) {
       coarseData._odata[sc]=coarseData._odata[sc]+fineData._odata[sf];
-
     }
   }
   return;
@@ -261,8 +342,20 @@ inline void blockPick(GridBase *coarse,const Lattice<vobj> &unpicked,Lattice<vob
   }
 }
 
+// Function overload to be able to support existing interface
+// However the function with only 2 arguments suffers from the
+// performance penalty of calculating the lookup table. The one
+// with 3 arguments is aimed at reusing the lookup table
 template<class vobj,class CComplex>
 inline void blockOrthogonalise(Lattice<CComplex> &ip,std::vector<Lattice<vobj> > &Basis)
+{
+  CoarseningLookUpTable lookUpTable(ip._grid, Basis[0]._grid);
+  blockOrthogonalise(ip, Basis, lookUpTable);
+}
+template<class vobj,class CComplex>
+inline void blockOrthogonalise(Lattice<CComplex> &ip,
+                               std::vector<Lattice<vobj> > &Basis,
+                               const CoarseningLookUpTable &lookUpTable)
 {
   GridBase *coarse = ip._grid;
   GridBase *fine   = Basis[0]._grid;
@@ -275,15 +368,16 @@ inline void blockOrthogonalise(Lattice<CComplex> &ip,std::vector<Lattice<vobj> >
   for(int i=0;i<nbasis;i++){
     conformable(Basis[i]._grid,fine);
   }
+  assert(lookUpTable.gridPointersMatch(coarse, fine));
 
   for(int v=0;v<nbasis;v++) {
     for(int u=0;u<v;u++) {
       //Inner product & remove component 
-      blockInnerProduct(ip,Basis[u],Basis[v]);
+      blockInnerProduct(ip,Basis[u],Basis[v],lookUpTable);
       ip = -ip;
       blockZAXPY<vobj,CComplex> (Basis[v],ip,Basis[u],Basis[v]);
     }
-    blockNormalise(ip,Basis[v]);
+    blockNormalise(ip,Basis[v],lookUpTable);
   }
 }
 
