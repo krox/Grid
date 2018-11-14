@@ -40,144 +40,6 @@ using namespace Grid::BenchmarkHelpers;
 #define NBASIS 32
 #endif
 
-template<class vobj,class CComplex>
-inline void blockInnerProductOriginal(Lattice<CComplex> &CoarseInner,
-                              const Lattice<vobj> &fineX,
-                              const Lattice<vobj> &fineY)
-{
-  // GridStopWatch totalTimer;
-  // GridStopWatch preambleTimer;
-  // GridStopWatch localInnerProductTimer;
-  // GridStopWatch blockSumTimer;
-  // GridStopWatch copyTimer;
-
-  // totalTimer.Start();
-  // preambleTimer.Start();
-  typedef decltype(innerProduct(fineX._odata[0],fineY._odata[0])) dotp;
-
-  GridBase *coarse(CoarseInner._grid);
-  GridBase *fine  (fineX._grid);
-
-  Lattice<dotp> fine_inner(fine); fine_inner.checkerboard = fineX.checkerboard;
-  Lattice<dotp> coarse_inner(coarse);
-  // preambleTimer.Stop();
-
-  // Precision promotion?
-  // localInnerProductTimer.Start();
-  fine_inner = localInnerProduct(fineX,fineY);
-  // localInnerProductTimer.Stop();
-  // blockSumTimer.Start();
-  blockSum(coarse_inner,fine_inner);
-  // blockSumTimer.Stop();
-  // copyTimer.Start();
-  parallel_for(int ss=0;ss<coarse->oSites();ss++){
-    CoarseInner._odata[ss] = coarse_inner._odata[ss];
-  }
-  // copyTimer.Stop();
-  // totalTimer.Stop();
-
-
-  // std::cout << "total             = " << totalTimer.Elapsed()             << " (" << 100. * totalTimer.useconds()/totalTimer.useconds()             << "% of total)" << std::endl;
-  // std::cout << "preamble          = " << preambleTimer.Elapsed()          << " (" << 100. * preambleTimer.useconds()/totalTimer.useconds()          << "% of total)" << std::endl;
-  // std::cout << "localInnerProduct = " << localInnerProductTimer.Elapsed() << " (" << 100. * localInnerProductTimer.useconds()/totalTimer.useconds() << "% of total)" << std::endl;
-  // std::cout << "blockSum          = " << blockSumTimer.Elapsed()          << " (" << 100. * blockSumTimer.useconds()/totalTimer.useconds()          << "% of total)" << std::endl;
-  // std::cout << "copy              = " << copyTimer.Elapsed()              << " (" << 100. * copyTimer.useconds()/totalTimer.useconds()              << "% of total)" << std::endl;
-}
-
-template<class vobj,class CComplex>
-inline void blockNormaliseOriginal(Lattice<CComplex> &ip,Lattice<vobj> &fineX)
-{
-  // GridStopWatch totalTimer;
-  // GridStopWatch preambleTimer;
-  // GridStopWatch blockInnerProductTimer;
-  // GridStopWatch powTimer;
-  // GridStopWatch blockZAXPYTimer;
-
-  // totalTimer.Start();
-  // preambleTimer.Start();
-  GridBase *coarse = ip._grid;
-  Lattice<vobj> zz(fineX._grid); zz=zero; zz.checkerboard=fineX.checkerboard;
-  // preambleTimer.Stop();
-
-  // blockInnerProductTimer.Start();
-  blockInnerProductOriginal(ip,fineX,fineX);
-  // blockInnerProductTimer.Stop();
-
-  // powTimer.Start();
-  ip = pow(ip,-0.5);
-  // powTimer.Stop();
-
-  // blockZAXPYTimer.Start();
-  blockZAXPY(fineX,ip,fineX,zz);
-  // blockZAXPYTimer.Stop();
-  // totalTimer.Stop();
-
-  // std::cout << "total             = "   << totalTimer.Elapsed()             << " (" << 100. * totalTimer.useconds()/totalTimer.useconds()             << "% of total)" << std::endl;
-  // std::cout << "preamble          = "   << preambleTimer.Elapsed()          << " (" << 100. * preambleTimer.useconds()/totalTimer.useconds()          << "% of total)" << std::endl;
-  // std::cout << "blockInnerProduct = "   << blockInnerProductTimer.Elapsed() << " (" << 100. * blockInnerProductTimer.useconds()/totalTimer.useconds() << "% of total)" << std::endl;
-  // std::cout << "pow               = "   << powTimer.Elapsed()               << " (" << 100. * powTimer.useconds()/totalTimer.useconds()               << "% of total)" << std::endl;
-  // std::cout << "blockZAXPY        = " << blockZAXPYTimer.Elapsed()          << " (" << 100. * blockZAXPYTimer.useconds()/totalTimer.useconds()        << "% of total)" << std::endl;
-}
-
-template<class vobj,class CComplex>
-inline void blockOrthogonaliseOriginal(Lattice<CComplex> &ip,std::vector<Lattice<vobj> > &Basis)
-{
-  // GridStopWatch totalTimer;
-  // GridStopWatch preambleTimer;
-  // GridStopWatch kernelTimer;
-  // GridStopWatch blockInnerProductTimer;
-  // GridStopWatch minusTimer;
-  // GridStopWatch blockZAXPYTimer;
-  // GridStopWatch blockNormaliseTimer;
-
-  // totalTimer.Start();
-  // preambleTimer.Start();
-  GridBase *coarse = ip._grid;
-  GridBase *fine   = Basis[0]._grid;
-
-  int       nbasis = Basis.size() ;
-  int  _ndimension = coarse->_ndimension;
-
-  // checks
-  subdivides(coarse,fine);
-  for(int i=0;i<nbasis;i++){
-    conformable(Basis[i]._grid,fine);
-  }
-  // preambleTimer.Stop();
-
-  int iters = 0;
-  // kernelTimer.Start();
-  for(int v=0;v<nbasis;v++) {
-    for(int u=0;u<v;u++) {
-      //Inner product & remove component
-      // blockInnerProductTimer.Start();
-      blockInnerProductOriginal(ip,Basis[u],Basis[v]);
-      // blockInnerProductTimer.Stop();
-      // minusTimer.Start();
-      ip = -ip;
-      // minusTimer.Stop();
-      // blockZAXPYTimer.Start();
-      blockZAXPY<vobj,CComplex> (Basis[v],ip,Basis[u],Basis[v]);
-      // blockZAXPYTimer.Stop();
-      iters++;
-    }
-    // blockNormaliseTimer.Start();
-    blockNormaliseOriginal(ip,Basis[v]);
-    // blockNormaliseTimer.Stop();
-  }
-  // kernelTimer.Stop();
-  // totalTimer.Stop();
-
-  // std::cout << "total             = " << totalTimer.Elapsed()             << " (" << 100. * totalTimer.useconds()/totalTimer.useconds()              << "% of total)"  << std::endl;
-  // std::cout << "preamble          = " << preambleTimer.Elapsed()          << " (" << 100. * preambleTimer.useconds()/totalTimer.useconds()           << "% of total)"  << std::endl;
-  // std::cout << "kernel            = " << kernelTimer.Elapsed()            << " (" << 100. * kernelTimer.useconds()/totalTimer.useconds()             << "% of total)"  << std::endl;
-  // std::cout << "blockInnerProduct = " << blockInnerProductTimer.Elapsed() << " (" << 100. * blockInnerProductTimer.useconds()/kernelTimer.useconds() << "% of kernel)" << std::endl;
-  // std::cout << "minus             = " << minusTimer.Elapsed()             << " (" << 100. * minusTimer.useconds()/kernelTimer.useconds()             << "% of kernel)" << std::endl;
-  // std::cout << "blockZAXPY        = " << blockZAXPYTimer.Elapsed()        << " (" << 100. * blockZAXPYTimer.useconds()/kernelTimer.useconds()        << "% of kernel)" << std::endl;
-  // std::cout << "blockNormalise    = " << blockNormaliseTimer.Elapsed()    << " (" << 100. * blockNormaliseTimer.useconds()/kernelTimer.useconds()    << "% of kernel)" << std::endl;
-  std::cout << "iters             = " << iters << std::endl;
-}
-
 int main(int argc, char **argv) {
   Grid_init(&argc, &argv);
 
@@ -245,33 +107,33 @@ int main(int argc, char **argv) {
 
   CoarseningLookUpTable lookUpTable(CGrid, FGrid);
 
-  BenchmarkFunction(blockOrthogonaliseOriginal, flop, byte, nIter, InnerProdOriginal, BasisOriginal);
-  BenchmarkFunction(blockOrthogonalise,         flop, byte, nIter, InnerProdNew2Args, BasisNew2Args);
-  BenchmarkFunction(blockOrthogonalise,         flop, byte, nIter, InnerProdNew3Args, BasisNew3Args, lookUpTable);
+  BenchmarkFunction(OriginalImpl::blockOrthogonalise, flop, byte, nIter, InnerProdOriginal, BasisOriginal);
+  BenchmarkFunction(blockOrthogonalise,               flop, byte, nIter, InnerProdNew2Args, BasisNew2Args);
+  BenchmarkFunction(blockOrthogonalise,               flop, byte, nIter, InnerProdNew3Args, BasisNew3Args, lookUpTable);
 
   for (auto i = 0; i < BasisOriginal.size(); ++i) printDeviationFromReference(BasisOriginal[i], BasisNew2Args[i]);
   for (auto i = 0; i < BasisOriginal.size(); ++i) printDeviationFromReference(BasisOriginal[i], BasisNew3Args[i]);
 
-  BenchmarkFunction(blockInnerProductOriginal, flop, byte, nIter, InnerProdOriginal, FineXOriginal, FineYOriginal);
-  BenchmarkFunction(blockInnerProduct,         flop, byte, nIter, InnerProdNew3Args, FineXOriginal, FineYOriginal, lookUpTable);
+  BenchmarkFunction(OriginalImpl::blockInnerProduct, flop, byte, nIter, InnerProdOriginal, FineXOriginal, FineYOriginal);
+  BenchmarkFunction(blockInnerProduct,               flop, byte, nIter, InnerProdNew3Args, FineXOriginal, FineYOriginal, lookUpTable);
 
   printDeviationFromReference(InnerProdOriginal, InnerProdNew3Args);
 
-  BenchmarkFunction(blockNormaliseOriginal, flop, byte, nIter, InnerProdOriginal, FineXOriginal);
-  BenchmarkFunction(blockNormalise,         flop, byte, nIter, InnerProdNew3Args, FineXNew, lookUpTable);
+  BenchmarkFunction(OriginalImpl::blockNormalise, flop, byte, nIter, InnerProdOriginal, FineXOriginal);
+  BenchmarkFunction(blockNormalise,              flop, byte, nIter, InnerProdNew3Args, FineXNew, lookUpTable);
 
   printDeviationFromReference(FineXOriginal, FineXNew);
 
   if (doPerfProfiling) {
-    PerfProfileFunction(blockOrthogonaliseOriginal, nIter, InnerProdOriginal, BasisOriginal);
-    PerfProfileFunction(blockOrthogonalise,         nIter, InnerProdNew2Args, BasisNew2Args);
-    PerfProfileFunction(blockOrthogonalise,         nIter, InnerProdNew3Args, BasisNew3Args, lookUpTable);
+    PerfProfileFunction(OriginalImpl::blockOrthogonalise, nIter, InnerProdOriginal, BasisOriginal);
+    PerfProfileFunction(blockOrthogonalise,               nIter, InnerProdNew2Args, BasisNew2Args);
+    PerfProfileFunction(blockOrthogonalise,               nIter, InnerProdNew3Args, BasisNew3Args, lookUpTable);
 
-    PerfProfileFunction(blockInnerProductOriginal, nIter, InnerProdOriginal, FineXOriginal, FineYOriginal);
-    PerfProfileFunction(blockInnerProduct,         nIter, InnerProdNew3Args, FineXOriginal, FineYOriginal, lookUpTable);
+    PerfProfileFunction(OriginalImpl::blockInnerProduct, nIter, InnerProdOriginal, FineXOriginal, FineYOriginal);
+    PerfProfileFunction(blockInnerProduct,               nIter, InnerProdNew3Args, FineXOriginal, FineYOriginal, lookUpTable);
 
-    PerfProfileFunction(blockNormaliseOriginal, nIter, InnerProdOriginal, FineXOriginal);
-    PerfProfileFunction(blockNormalise,         nIter, InnerProdNew3Args, FineXNew, lookUpTable);
+    PerfProfileFunction(OriginalImpl::blockNormalise, nIter, InnerProdOriginal, FineXOriginal);
+    PerfProfileFunction(blockNormalise,               nIter, InnerProdNew3Args, FineXNew, lookUpTable);
   }
 
   Grid_finalize();

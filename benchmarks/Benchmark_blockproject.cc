@@ -40,52 +40,6 @@ using namespace Grid::BenchmarkHelpers;
 #define NBASIS 32
 #endif
 
-template<class vobj,class CComplex,int nbasis>
-inline void blockProjectOriginal(Lattice<iVector<CComplex,nbasis > > &coarseData,
-                                 const             Lattice<vobj>   &fineData,
-                                 const std::vector<Lattice<vobj> > &Basis)
-{
-  GridBase * fine  = fineData._grid;
-  GridBase * coarse= coarseData._grid;
-  int  _ndimension = coarse->_ndimension;
-
-  // checks
-  assert( nbasis == Basis.size() );
-  subdivides(coarse,fine);
-  for(int i=0;i<nbasis;i++){
-    conformable(Basis[i],fineData);
-  }
-
-  std::vector<int>  block_r      (_ndimension);
-
-  for(int d=0 ; d<_ndimension;d++){
-    block_r[d] = fine->_rdimensions[d] / coarse->_rdimensions[d];
-    assert(block_r[d]*coarse->_rdimensions[d] == fine->_rdimensions[d]);
-  }
-
-  coarseData=zero;
-
-  // Loop over coars parallel, and then loop over fine associated with coarse.
-  parallel_for(int sf=0;sf<fine->oSites();sf++){
-
-    int sc;
-    std::vector<int> coor_c(_ndimension);
-    std::vector<int> coor_f(_ndimension);
-    Lexicographic::CoorFromIndex(coor_f,sf,fine->_rdimensions);
-    for(int d=0;d<_ndimension;d++) coor_c[d]=coor_f[d]/block_r[d];
-    Lexicographic::IndexFromCoor(coor_c,sc,coarse->_rdimensions);
-
-PARALLEL_CRITICAL
-    for(int i=0;i<nbasis;i++) {
-
-      coarseData._odata[sc](i)=coarseData._odata[sc](i)
-	+ innerProduct(Basis[i]._odata[sf],fineData._odata[sf]);
-
-    }
-  }
-  return;
-}
-
 int main(int argc, char **argv) {
   Grid_init(&argc, &argv);
 
@@ -151,17 +105,17 @@ int main(int argc, char **argv) {
 
   CoarseningLookUpTable lookUpTable(CGrid, FGrid);
 
-  BenchmarkFunction(blockProjectOriginal, flop, byte, nIter, CoarseVecOriginal, FineVec, Aggs.subspace);
-  BenchmarkFunction(blockProject,         flop, byte, nIter, CoarseVec,         FineVec, Aggs.subspace);
-  BenchmarkFunction(blockProject,         flop, byte, nIter, CoarseVecNew,      FineVec, Aggs.subspace, lookUpTable);
+  BenchmarkFunction(OriginalImpl::blockProject, flop, byte, nIter, CoarseVecOriginal, FineVec, Aggs.subspace);
+  BenchmarkFunction(blockProject,               flop, byte, nIter, CoarseVec,         FineVec, Aggs.subspace);
+  BenchmarkFunction(blockProject,               flop, byte, nIter, CoarseVecNew,      FineVec, Aggs.subspace, lookUpTable);
 
   printDeviationFromReference(CoarseVecOriginal, CoarseVec);
   printDeviationFromReference(CoarseVecOriginal, CoarseVecNew);
 
   if (doPerfProfiling) {
-    PerfProfileFunction(blockProjectOriginal, nIter, CoarseVecOriginal, FineVec, Aggs.subspace);
-    PerfProfileFunction(blockProject,         nIter, CoarseVec,         FineVec, Aggs.subspace);
-    PerfProfileFunction(blockProject,         nIter, CoarseVecNew,      FineVec, Aggs.subspace, lookUpTable);
+    PerfProfileFunction(OriginalImpl::blockProject, nIter, CoarseVecOriginal, FineVec, Aggs.subspace);
+    PerfProfileFunction(blockProject,               nIter, CoarseVec,         FineVec, Aggs.subspace);
+    PerfProfileFunction(blockProject,               nIter, CoarseVecNew,      FineVec, Aggs.subspace, lookUpTable);
   }
 
   Grid_finalize();

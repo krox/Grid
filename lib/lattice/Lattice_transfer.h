@@ -1177,5 +1177,149 @@ void Grid_unsplit(std::vector<Lattice<Vobj> > & full,Lattice<Vobj>   & split)
   }
 }
 
+namespace OriginalImpl {
+
+template<class vobj,class CComplex,int nbasis>
+inline void blockProject(Lattice<iVector<CComplex,nbasis > > &coarseData,
+                         const             Lattice<vobj>   &fineData,
+                         const std::vector<Lattice<vobj> > &Basis)
+{
+  GridBase * fine  = fineData._grid;
+  GridBase * coarse= coarseData._grid;
+  int  _ndimension = coarse->_ndimension;
+
+  // checks
+  assert( nbasis == Basis.size() );
+  subdivides(coarse,fine);
+  for(int i=0;i<nbasis;i++){
+    conformable(Basis[i],fineData);
+  }
+
+  std::vector<int>  block_r      (_ndimension);
+
+  for(int d=0 ; d<_ndimension;d++){
+    block_r[d] = fine->_rdimensions[d] / coarse->_rdimensions[d];
+    assert(block_r[d]*coarse->_rdimensions[d] == fine->_rdimensions[d]);
+  }
+
+  coarseData=zero;
+
+  // Loop over coars parallel, and then loop over fine associated with coarse.
+  parallel_for(int sf=0;sf<fine->oSites();sf++){
+
+    int sc;
+    std::vector<int> coor_c(_ndimension);
+    std::vector<int> coor_f(_ndimension);
+    Lexicographic::CoorFromIndex(coor_f,sf,fine->_rdimensions);
+    for(int d=0;d<_ndimension;d++) coor_c[d]=coor_f[d]/block_r[d];
+    Lexicographic::IndexFromCoor(coor_c,sc,coarse->_rdimensions);
+
+PARALLEL_CRITICAL
+    for(int i=0;i<nbasis;i++) {
+
+      coarseData._odata[sc](i)=coarseData._odata[sc](i)
+	+ innerProduct(Basis[i]._odata[sf],fineData._odata[sf]);
+
+    }
+  }
+  return;
+}
+
+template<class vobj>
+inline void blockSum(Lattice<vobj> &coarseData,const Lattice<vobj> &fineData)
+{
+  GridBase * fine  = fineData._grid;
+  GridBase * coarse= coarseData._grid;
+
+  subdivides(coarse,fine); // require they map
+
+  int _ndimension = coarse->_ndimension;
+
+  std::vector<int>  block_r      (_ndimension);
+
+  for(int d=0 ; d<_ndimension;d++){
+    block_r[d] = fine->_rdimensions[d] / coarse->_rdimensions[d];
+  }
+
+  // Turn this around to loop threaded over sc and interior loop
+  // over sf would thread better
+  coarseData=zero;
+  parallel_region {
+
+    int sc;
+    std::vector<int> coor_c(_ndimension);
+    std::vector<int> coor_f(_ndimension);
+
+    parallel_for_internal(int sf=0;sf<fine->oSites();sf++){
+
+      Lexicographic::CoorFromIndex(coor_f,sf,fine->_rdimensions);
+      for(int d=0;d<_ndimension;d++) coor_c[d]=coor_f[d]/block_r[d];
+      Lexicographic::IndexFromCoor(coor_c,sc,coarse->_rdimensions);
+
+PARALLEL_CRITICAL
+      coarseData._odata[sc]=coarseData._odata[sc]+fineData._odata[sf];
+
+    }
+  }
+  return;
+}
+
+template<class vobj,class CComplex>
+inline void blockInnerProduct(Lattice<CComplex> &CoarseInner,
+                              const Lattice<vobj> &fineX,
+                              const Lattice<vobj> &fineY)
+{
+  typedef decltype(innerProduct(fineX._odata[0],fineY._odata[0])) dotp;
+
+  GridBase *coarse(CoarseInner._grid);
+  GridBase *fine  (fineX._grid);
+
+  Lattice<dotp> fine_inner(fine); fine_inner.checkerboard = fineX.checkerboard;
+  Lattice<dotp> coarse_inner(coarse);
+
+  // Precision promotion?
+  fine_inner = localInnerProduct(fineX,fineY);
+  Grid::OriginalImpl::blockSum(coarse_inner,fine_inner);
+  parallel_for(int ss=0;ss<coarse->oSites();ss++){
+    CoarseInner._odata[ss] = coarse_inner._odata[ss];
+  }
+}
+
+template<class vobj,class CComplex>
+inline void blockNormalise(Lattice<CComplex> &ip,Lattice<vobj> &fineX)
+{
+  GridBase *coarse = ip._grid;
+  Lattice<vobj> zz(fineX._grid); zz=zero; zz.checkerboard=fineX.checkerboard;
+  blockInnerProduct(ip,fineX,fineX);
+  ip = pow(ip,-0.5);
+  blockZAXPY(fineX,ip,fineX,zz);
+}
+
+template<class vobj,class CComplex>
+inline void blockOrthogonalise(Lattice<CComplex> &ip,std::vector<Lattice<vobj> > &Basis)
+{
+  GridBase *coarse = ip._grid;
+  GridBase *fine   = Basis[0]._grid;
+
+  int       nbasis = Basis.size() ;
+  int  _ndimension = coarse->_ndimension;
+
+  // checks
+  subdivides(coarse,fine);
+  for(int i=0;i<nbasis;i++){
+    conformable(Basis[i]._grid,fine);
+  }
+  for(int v=0;v<nbasis;v++) {
+    for(int u=0;u<v;u++) {
+      //Inner product & remove component
+      blockInnerProduct(ip,Basis[u],Basis[v]);
+      ip = -ip;
+      blockZAXPY<vobj,CComplex> (Basis[v],ip,Basis[u],Basis[v]);
+    }
+  }
+}
+
+}
+
 }
 #endif

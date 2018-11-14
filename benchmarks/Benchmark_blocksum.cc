@@ -40,45 +40,6 @@ using namespace Grid::BenchmarkHelpers;
 #define NBASIS 32
 #endif
 
-template<class vobj>
-inline void blockSumOriginal(Lattice<vobj> &coarseData,const Lattice<vobj> &fineData)
-{
-  GridBase * fine  = fineData._grid;
-  GridBase * coarse= coarseData._grid;
-
-  subdivides(coarse,fine); // require they map
-
-  int _ndimension = coarse->_ndimension;
-
-  std::vector<int>  block_r      (_ndimension);
-
-  for(int d=0 ; d<_ndimension;d++){
-    block_r[d] = fine->_rdimensions[d] / coarse->_rdimensions[d];
-  }
-
-  // Turn this around to loop threaded over sc and interior loop
-  // over sf would thread better
-  coarseData=zero;
-  parallel_region {
-
-    int sc;
-    std::vector<int> coor_c(_ndimension);
-    std::vector<int> coor_f(_ndimension);
-
-    parallel_for_internal(int sf=0;sf<fine->oSites();sf++){
-
-      Lexicographic::CoorFromIndex(coor_f,sf,fine->_rdimensions);
-      for(int d=0;d<_ndimension;d++) coor_c[d]=coor_f[d]/block_r[d];
-      Lexicographic::IndexFromCoor(coor_c,sc,coarse->_rdimensions);
-
-PARALLEL_CRITICAL
-      coarseData._odata[sc]=coarseData._odata[sc]+fineData._odata[sf];
-
-    }
-  }
-  return;
-}
-
 int main(int argc, char **argv) {
   Grid_init(&argc, &argv);
 
@@ -143,17 +104,17 @@ int main(int argc, char **argv) {
 
   CoarseningLookUpTable lookUpTable(CGrid, FGrid);
 
-  BenchmarkFunction(blockSumOriginal, flop, byte, nIter, CoarseInnerOriginal, FineInner);
-  BenchmarkFunction(blockSum,         flop, byte, nIter, CoarseInnerNew2Args, FineInner);
-  BenchmarkFunction(blockSum,         flop, byte, nIter, CoarseInnerNew3Args, FineInner, lookUpTable);
+  BenchmarkFunction(OriginalImpl::blockSum, flop, byte, nIter, CoarseInnerOriginal, FineInner);
+  BenchmarkFunction(blockSum,               flop, byte, nIter, CoarseInnerNew2Args, FineInner);
+  BenchmarkFunction(blockSum,               flop, byte, nIter, CoarseInnerNew3Args, FineInner, lookUpTable);
 
   printDeviationFromReference(CoarseInnerOriginal, CoarseInnerNew2Args);
   printDeviationFromReference(CoarseInnerOriginal, CoarseInnerNew3Args);
 
   if (doPerfProfiling) {
-    PerfProfileFunction(blockSumOriginal, nIter, CoarseInnerOriginal, FineInner);
-    PerfProfileFunction(blockSum,         nIter, CoarseInnerNew2Args, FineInner);
-    PerfProfileFunction(blockSum,         nIter, CoarseInnerNew3Args, FineInner, lookUpTable);
+    PerfProfileFunction(OriginalImpl::blockSum, nIter, CoarseInnerOriginal, FineInner);
+    PerfProfileFunction(blockSum,               nIter, CoarseInnerNew2Args, FineInner);
+    PerfProfileFunction(blockSum,               nIter, CoarseInnerNew3Args, FineInner, lookUpTable);
   }
 
   Grid_finalize();
