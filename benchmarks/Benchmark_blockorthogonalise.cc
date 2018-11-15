@@ -93,34 +93,61 @@ int main(int argc, char **argv) {
   CoarseScalar InnerProdNew2Args(CGrid);
   CoarseScalar InnerProdNew3Args(CGrid);
 
-  auto FSiteElems = getSiteElems<LatticeFermion>();
-  auto CSiteElems = getSiteElems<CoarseScalar>();
+  auto FSiteVecElems = getSiteElems<LatticeFermion>();
+  auto FSiteScalarElems = getSiteElems<decltype(innerProduct(FineXOriginal._odata[0], FineYOriginal._odata[0]))>();
+  auto CSiteScalarElems = getSiteElems<CoarseScalar>();
 
   std::cout << FSiteElems << " " << CSiteElems << std::endl;
 
   auto FVolume = std::accumulate(FGrid->_fdimensions.begin(), FGrid->_fdimensions.end(), 1, std::multiplies<double>());
   auto CVolume = std::accumulate(CGrid->_fdimensions.begin(), CGrid->_fdimensions.end(), 1, std::multiplies<double>());
 
-  // TODO: Calculate correct values here
-  double flop = 1. * (1);
-  double byte = 1. * (1);
+  // These belong to blockInnerProduct
+  double flopLocalInnerProduct = 1. * (8 * FSiteVecElems - 2) * FVolume;
+  double byteLocalInnerProduct = 1. * (2 * FSiteVecElems + 1 * FSiteScalarElems) * FVolume * sizeof(Complex);
+
+  double flopBlockSum = 1. * (2 * FSiteScalarElems) * FVolume;
+  double byteBlockSum = 1. * (2 * CSiteScalarElems + 1 * FSiteScalarElems) * FVolume * sizeof(Complex); // TODO: Correct this number in the blockSum benchmark file
+
+  double flopCopy = 1. * 0;
+  double byteCopy = 1. * (2 * CSiteScalarElems) * CVolume * sizeof(Complex); // TODO: In terms of user intended byte, this should be zero
+
+  double flopBlockInnerProduct = flopLocalInnerProduct + flopBlockSum + flopCopy;
+  double byteBlockInnerProduct = byteLocalInnerProduct + byteBlockSum + byteCopy;
+
+  // These belong to blockNormalise
+  double flopPow = 1. * (1) * CVolume; // TODO: I didn't know what to put for the 1
+  double bytePow = 1. * (2 * CSiteScalarElems) * CVolume * sizeof(Complex);
+
+  double flopBlockZAXPY = 1. * (8 * FSiteVecElems) * FVolume;
+  double byteBlockZAXPY = 1. * (3 * FSiteVecElems + 1 * CSiteScalarElems) * FVolume * sizeof(Complex); // TODO: Correct this number in the zaxpy benchmark file
+
+  double flopBlockNormalise = flopBlockInnerProduct + flopPow + flopBlockZAXPY;
+  double byteBlockNormalise = byteBlockInnerProduct + bytePow + byteBlockZAXPY;
+
+  // These belong to blockOrthogonalise
+  double flopMinus = 1. * (6 * CSiteScalarElems) * CVolume * sizeof(Complex); // TODO: This is actually a real multiplication
+  double byteMinus = 1. * (2 * CSiteScalarElems) * CVolume * sizeof(Complex);
+
+  double flopBlockOrthogonalise = flopBlockNormalise * nBasis + (flopBlockInnerProduct + flopMinus + flopBlockZAXPY) * nBasis * (nBasis - 1) / 2.;
+  double byteBlockOrthogonalise = byteBlockNormalise * nBasis + (byteBlockInnerProduct + byteMinus + byteBlockZAXPY) * nBasis * (nBasis - 1) / 2.;
 
   CoarseningLookUpTable lookUpTable(CGrid, FGrid);
 
-  BenchmarkFunction(OriginalImpl::blockOrthogonalise, flop, byte, nIter, InnerProdOriginal, BasisOriginal);
-  BenchmarkFunction(blockOrthogonalise,               flop, byte, nIter, InnerProdNew2Args, BasisNew2Args);
-  BenchmarkFunction(blockOrthogonalise,               flop, byte, nIter, InnerProdNew3Args, BasisNew3Args, lookUpTable);
+  BenchmarkFunction(OriginalImpl::blockOrthogonalise, flopBlockOrthogonalise, byteBlockOrthogonalise, nIter, InnerProdOriginal, BasisOriginal);
+  BenchmarkFunction(blockOrthogonalise,               flopBlockOrthogonalise, byteBlockOrthogonalise, nIter, InnerProdNew2Args, BasisNew2Args);
+  BenchmarkFunction(blockOrthogonalise,               flopBlockOrthogonalise, byteBlockOrthogonalise, nIter, InnerProdNew3Args, BasisNew3Args, lookUpTable);
 
   for (auto i = 0; i < BasisOriginal.size(); ++i) printDeviationFromReference(BasisOriginal[i], BasisNew2Args[i]);
   for (auto i = 0; i < BasisOriginal.size(); ++i) printDeviationFromReference(BasisOriginal[i], BasisNew3Args[i]);
 
-  BenchmarkFunction(OriginalImpl::blockInnerProduct, flop, byte, nIter, InnerProdOriginal, FineXOriginal, FineYOriginal);
-  BenchmarkFunction(blockInnerProduct,               flop, byte, nIter, InnerProdNew3Args, FineXOriginal, FineYOriginal, lookUpTable);
+  BenchmarkFunction(OriginalImpl::blockInnerProduct, flopBlockInnerProduct, byteBlockInnerProduct, nIter, InnerProdOriginal, FineXOriginal, FineYOriginal);
+  BenchmarkFunction(blockInnerProduct,               flopBlockInnerProduct, byteBlockInnerProduct, nIter, InnerProdNew3Args, FineXOriginal, FineYOriginal, lookUpTable);
 
   printDeviationFromReference(InnerProdOriginal, InnerProdNew3Args);
 
-  BenchmarkFunction(OriginalImpl::blockNormalise, flop, byte, nIter, InnerProdOriginal, FineXOriginal);
-  BenchmarkFunction(blockNormalise,              flop, byte, nIter, InnerProdNew3Args, FineXNew, lookUpTable);
+  BenchmarkFunction(OriginalImpl::blockNormalise, flopBlockNormalise, byteBlockNormalise, nIter, InnerProdOriginal, FineXOriginal);
+  BenchmarkFunction(blockNormalise,               flopBlockNormalise, byteBlockNormalise, nIter, InnerProdNew3Args, FineXNew, lookUpTable);
 
   printDeviationFromReference(FineXOriginal, FineXNew);
 
