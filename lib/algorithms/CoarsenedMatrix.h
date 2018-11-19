@@ -697,7 +697,7 @@ namespace Grid {
       FineFermionField zz(FineGrid); zz = zero;
       std::vector<FineFermionField> MphiSplit(len, FineGrid);
 
-      Lattice<iScalar<vInteger>> coor(FineGrid);
+      std::vector<Lattice<iScalar<vInteger> > > coor(_geom.npoint, FineGrid);
 
       std::vector<FermionField> iProjSplit(len, Grid());
       std::vector<FermionField> oProjSplit(len, Grid());
@@ -721,6 +721,12 @@ namespace Grid {
       assert(self_stencil != -1);
       PerfMonitors["Misc"].Stop();
 
+      PerfMonitors["LatticeCoord"].Start();
+      for(int p=0;p<_geom.npoint;p++) {
+        LatticeCoordinate(coor[p],_geom.directions[p]);
+      }
+      PerfMonitors["LatticeCoord"].Stop();
+
       for(int i = 0; i < Nbasis; i++) {
         PerfMonitors["Copy"].Start();
         extractChiralComponents<isTwoSpinVersion>(phiSplit, Aggregates._subspace[i]);
@@ -736,10 +742,6 @@ namespace Grid {
 
           Integer block = (FineGrid->_rdimensions[dir]) / (Grid()->_rdimensions[dir]);
           PerfMonitors["Misc"].Stop();
-
-          PerfMonitors["LatticeCoord"].Start();
-          LatticeCoordinate(coor, dir);
-          PerfMonitors["LatticeCoord"].Stop();
 
           PerfMonitors["ApplyOp"].Start();
           if(disp == 0) {
@@ -768,22 +770,22 @@ namespace Grid {
             // oblockLower = zero;
           } else if(disp == 1) {
             for(int k = 0; k < len; k++) {
-              oblockSplit[k] = where(mod(coor, block) == (block - 1), MphiSplit[k], zz);
-              iblockSplit[k] = where(mod(coor, block) != (block - 1), MphiSplit[k], zz);
+              oblockSplit[k] = where(mod(coor[p], block) == (block - 1), MphiSplit[k], zz);
+              iblockSplit[k] = where(mod(coor[p], block) != (block - 1), MphiSplit[k], zz);
             }
-            // oblockUpper = where(mod(coor, block) == (block - 1), MphiUpper, zz);
-            // oblockLower = where(mod(coor, block) == (block - 1), MphiLower, zz);
-            // iblockUpper = where(mod(coor, block) != (block - 1), MphiUpper, zz);
-            // iblockLower = where(mod(coor, block) != (block - 1), MphiLower, zz);
+            // oblockUpper = where(mod(coor[p], block) == (block - 1), MphiUpper, zz);
+            // oblockLower = where(mod(coor[p], block) == (block - 1), MphiLower, zz);
+            // iblockUpper = where(mod(coor[p], block) != (block - 1), MphiUpper, zz);
+            // iblockLower = where(mod(coor[p], block) != (block - 1), MphiLower, zz);
           } else if(disp == -1) {
             for(int k = 0; k < len; k++) {
-              oblockSplit[k] = where(mod(coor, block) == (Integer)0, MphiSplit[k], zz);
-              iblockSplit[k] = where(mod(coor, block) != (Integer)0, MphiSplit[k], zz);
+              oblockSplit[k] = where(mod(coor[p], block) == (Integer)0, MphiSplit[k], zz);
+              iblockSplit[k] = where(mod(coor[p], block) != (Integer)0, MphiSplit[k], zz);
             }
-            // oblockUpper = where(mod(coor, block) == (Integer)0, MphiUpper, zz);
-            // oblockLower = where(mod(coor, block) == (Integer)0, MphiLower, zz);
-            // iblockUpper = where(mod(coor, block) != (Integer)0, MphiUpper, zz);
-            // iblockLower = where(mod(coor, block) != (Integer)0, MphiLower, zz);
+            // oblockUpper = where(mod(coor[p], block) == (Integer)0, MphiUpper, zz);
+            // oblockLower = where(mod(coor[p], block) == (Integer)0, MphiLower, zz);
+            // iblockUpper = where(mod(coor[p], block) != (Integer)0, MphiUpper, zz);
+            // iblockLower = where(mod(coor[p], block) != (Integer)0, MphiLower, zz);
           } else {
             assert(0);
           }
