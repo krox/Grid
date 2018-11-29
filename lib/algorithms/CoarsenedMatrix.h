@@ -340,7 +340,7 @@ namespace Grid {
     void ProjectToSubspace(FermionField &CoarseVec, const FineFermionField &FineVec) {
       std::cout << GridLogDebug << "Imlementation of " << __FUNCTION__ << " with 2 (= fewer) args called" << std::endl;
       CoarseningLookUpTable lookUpTable(_coarseGrid, _fineGrid);
-      blockProject(CoarseVec, FineVec, lookUpTable);
+      ProjectToSubspace(CoarseVec, FineVec, lookUpTable);
     }
     void ProjectToSubspace(FermionField &CoarseVec,
                            const FineFermionField &FineVec,
