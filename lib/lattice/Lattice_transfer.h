@@ -86,6 +86,22 @@ public:
     }
   }
 
+  template <typename ScalarField>
+  void deleteUnneededFineSites(ScalarField const & in) {
+    assert(in._grid == _fine);
+
+    typename ScalarField::scalar_type zz(0.);
+    parallel_for(int sc = 0; sc < _coarse->oSites(); sc++) {
+      std::vector<int> tmp;
+      for(int i = 0; i < _lut[sc].size(); i++) {
+        int sf = _lut[sc][i];
+        if(Reduce(TensorRemove(in._odata[sf])) != zz)
+          tmp.push_back(sf);
+      }
+      _lut[sc] = tmp;
+    }
+  }
+
 private:
   void populate() {
     int _ndimension = _coarse->_ndimension;

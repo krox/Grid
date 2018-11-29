@@ -683,19 +683,20 @@ namespace Grid {
       PerfMonitors["Misc"].Start();
 
       auto len = 2; // TODO: This should either be Ncs or Nsb, not a hard-coded 2
-      std::vector<FineFermionField> iblockSplit(len, FineGrid);
-      std::vector<FineFermionField> oblockSplit(len, FineGrid);
 
       FineFermionField phi(FineGrid);
       std::vector<FineFermionField> phiSplit(len, FineGrid);
-      FineFermionField tmp(FineGrid);
-      FineFermionField zz(FineGrid); zz = zero;
       std::vector<FineFermionField> MphiSplit(len, FineGrid);
-
-      std::vector<Lattice<iScalar<vInteger> > > coor(_geom.npoint, FineGrid);
 
       std::vector<FermionField> iProjSplit(len, Grid());
       std::vector<FermionField> oProjSplit(len, Grid());
+
+      FineScalarField one(FineGrid); one = 1.;
+      FineScalarField zz(FineGrid);   zz = zero;
+      FineScalarField iTmp(FineGrid);
+      FineScalarField oTmp(FineGrid);
+
+      std::vector<Lattice<iScalar<vInteger> > > coor(_geom.npoint, FineGrid); // TODO: Can this be changed to a FineScalarField?
       PerfMonitors["Misc"].Stop();
 
       PerfMonitors["Orthogonalise"].Start();
@@ -720,7 +721,7 @@ namespace Grid {
       for(int p=0;p<_geom.npoint;p++) {
         LatticeCoordinate(coor[p],_geom.directions[p]);
       }
-      PerfMonitors["LatticeCoord"].Stop();
+      PerfMonitors["LatticeCoord"].Stop(_geom.npoint);
 
       for(int i = 0; i < Nbasis; i++) {
         PerfMonitors["Copy"].Start();
@@ -742,54 +743,38 @@ namespace Grid {
           if(disp == 0) {
             for(int k = 0; k < len; k++)
               linop.OpDiag(phiSplit[k], MphiSplit[k]);
-            // linop.OpDiag(phiUpper, MphiUpper);
-            // linop.OpDiag(phiLower, MphiLower);
           } else {
             for(int k = 0; k < len; k++)
               linop.OpDir(phiSplit[k], MphiSplit[k], dir, disp);
-            // linop.OpDir(phiUpper, MphiUpper, dir, disp);
-            // linop.OpDir(phiLower, MphiLower, dir, disp);
           }
-          PerfMonitors["ApplyOp"].Stop();
+          PerfMonitors["ApplyOp"].Stop(len);
 
           ////////////////////////////////////////////////////////////////////////
           // Pick out contributions coming from this cell and neighbour cell
           ////////////////////////////////////////////////////////////////////////
           PerfMonitors["PickBlocks"].Start();
+          CoarseningLookUpTable iLut(Grid(), FineGrid);
+          CoarseningLookUpTable oLut(Grid(), FineGrid);
           if(disp == 0) {
-            iblockSplit = MphiSplit;
-            for(int k = 0; k < len; k++) oblockSplit[k] = zero;
-            // iblockUpper = MphiUpper;
-            // iblockLower = MphiLower;
-            // oblockUpper = zero;
-            // oblockLower = zero;
+            iTmp = one;
+            oTmp = zz;
           } else if(disp == 1) {
-            for(int k = 0; k < len; k++) {
-              oblockSplit[k] = where(mod(coor[p], block) == (block - 1), MphiSplit[k], zz);
-              iblockSplit[k] = where(mod(coor[p], block) != (block - 1), MphiSplit[k], zz);
-            }
-            // oblockUpper = where(mod(coor[p], block) == (block - 1), MphiUpper, zz);
-            // oblockLower = where(mod(coor[p], block) == (block - 1), MphiLower, zz);
-            // iblockUpper = where(mod(coor[p], block) != (block - 1), MphiUpper, zz);
-            // iblockLower = where(mod(coor[p], block) != (block - 1), MphiLower, zz);
+            oTmp = where(mod(coor[p], block) == (block - 1), one, zz);
+            iTmp = where(mod(coor[p], block) != (block - 1), one, zz);
           } else if(disp == -1) {
-            for(int k = 0; k < len; k++) {
-              oblockSplit[k] = where(mod(coor[p], block) == (Integer)0, MphiSplit[k], zz);
-              iblockSplit[k] = where(mod(coor[p], block) != (Integer)0, MphiSplit[k], zz);
-            }
-            // oblockUpper = where(mod(coor[p], block) == (Integer)0, MphiUpper, zz);
-            // oblockLower = where(mod(coor[p], block) == (Integer)0, MphiLower, zz);
-            // iblockUpper = where(mod(coor[p], block) != (Integer)0, MphiUpper, zz);
-            // iblockLower = where(mod(coor[p], block) != (Integer)0, MphiLower, zz);
+            oTmp = where(mod(coor[p], block) == (Integer)0, one, zz);
+            iTmp = where(mod(coor[p], block) != (Integer)0, one, zz);
           } else {
             assert(0);
           }
+          iLut.deleteUnneededFineSites(iTmp);
+          oLut.deleteUnneededFineSites(oTmp);
           PerfMonitors["PickBlocks"].Stop();
 
           PerfMonitors["ProjectToSubspace"].Start();
           for(int k = 0; k < len; k++) {
-            Aggregates.ProjectToSubspace(iProjSplit[k], iblockSplit[k]);
-            Aggregates.ProjectToSubspace(oProjSplit[k], oblockSplit[k]);
+            Aggregates.ProjectToSubspace(iProjSplit[k], MphiSplit[k], iLut);
+            Aggregates.ProjectToSubspace(oProjSplit[k], MphiSplit[k], oLut);
           }
           PerfMonitors["ProjectToSubspace"].Stop(len*2);
 
