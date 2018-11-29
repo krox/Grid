@@ -791,18 +791,10 @@ namespace Grid {
                 for(int k = 0; k < len; k++)
                   for(int l = 0; l < len; l++)
                     _Y[p]._odata[ss]()(l, k)(j, i) = oProjSplit[k]._odata[ss]()(l)(j);
-                // _Y[p]._odata[ss]()(0, 0)(j, i) = oProjUpper._odata[ss]()(0)(j);
-                // _Y[p]._odata[ss]()(1, 0)(j, i) = oProjUpper._odata[ss]()(1)(j);
-                // _Y[p]._odata[ss]()(0, 1)(j, i) = oProjLower._odata[ss]()(0)(j);
-                // _Y[p]._odata[ss]()(1, 1)(j, i) = oProjLower._odata[ss]()(1)(j);
               }
               for(int k = 0; k < len; k++)
                 for(int l = 0; l < len; l++)
                   _Y[self_stencil]._odata[ss]()(l, k)(j, i) = _Y[self_stencil]._odata[ss]()(l, k)(j, i) + iProjSplit[k]._odata[ss]()(l)(j);
-              // _Y[self_stencil]._odata[ss]()(0, 0)(j, i) = _Y[self_stencil]._odata[ss]()(0, 0)(j, i) + iProjUpper._odata[ss]()(0)(j);
-              // _Y[self_stencil]._odata[ss]()(1, 0)(j, i) = _Y[self_stencil]._odata[ss]()(1, 0)(j, i) + iProjUpper._odata[ss]()(1)(j);
-              // _Y[self_stencil]._odata[ss]()(0, 1)(j, i) = _Y[self_stencil]._odata[ss]()(0, 1)(j, i) + iProjLower._odata[ss]()(0)(j);
-              // _Y[self_stencil]._odata[ss]()(1, 1)(j, i) = _Y[self_stencil]._odata[ss]()(1, 1)(j, i) + iProjLower._odata[ss]()(1)(j);
             }
           }
           PerfMonitors["ConstructLinks"].Stop();
