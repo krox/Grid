@@ -329,42 +329,30 @@ namespace Grid {
       subdivides(_coarseGrid, _fineGrid);
     }
 
+    // This function overload is done in analogy to that of the original "blockProject"
     void ProjectToSubspace(FermionField &CoarseVec, const FineFermionField &FineVec) {
-      int _ndimension = _coarseGrid->_ndimension;
+      std::cout << GridLogDebug << "Imlementation of " << __FUNCTION__ << " with 2 (= fewer) args called" << std::endl;
+      CoarseningLookUpTable lookUpTable(_coarseGrid, _fineGrid);
+      blockProject(CoarseVec, FineVec, lookUpTable);
+    }
+    void ProjectToSubspace(FermionField &CoarseVec,
+                           const FineFermionField &FineVec,
+                           const CoarseningLookUpTable &lookUpTable) {
+      std::cout << GridLogDebug << "Implementation of " << __FUNCTION__ << " with 3 (= more) args called" << std::endl;
+      GridBase *fine   = FineVec._grid;
+      GridBase *coarse = CoarseVec._grid;
 
-      // checks
+      assert(lookUpTable.gridPointersMatch(coarse, fine));
       assert(Nbasis == _subspace.size());
-      conformable(_coarseGrid, CoarseVec._grid);
-      conformable(_fineGrid, FineVec._grid);
       for(int i = 0; i < Nbasis; i++) {
         conformable(_subspace[i], FineVec);
       }
 
-      std::vector<int> block_r(_ndimension);
-
-      for(int d = 0; d < _ndimension; d++) {
-        block_r[d] = _fineGrid->_rdimensions[d] / _coarseGrid->_rdimensions[d];
-        assert(block_r[d] * _coarseGrid->_rdimensions[d] == _fineGrid->_rdimensions[d]);
-      }
-
       CoarseVec = zero;
-
-      std::vector<std::vector<int>> lookUpTable(_coarseGrid->oSites());
-
-      for(int sf = 0; sf < _fineGrid->oSites(); sf++) {
-        int              sc;
-        std::vector<int> coor_c(_ndimension);
-        std::vector<int> coor_f(_ndimension);
-        Lexicographic::CoorFromIndex(coor_f, sf, _fineGrid->_rdimensions);
-        for(int d = 0; d < _ndimension; d++) coor_c[d] = coor_f[d] / block_r[d];
-        Lexicographic::IndexFromCoor(coor_c, sc, _coarseGrid->_rdimensions);
-        lookUpTable[sc].push_back(sf);
-      }
-
       // Thread over coarse sites so we can get rid of the critical region
       parallel_for(int sc = 0; sc < _coarseGrid->oSites(); sc++) {
         for(int i = 0; i < Nbasis; i++) {
-          for(auto sf : lookUpTable[sc]) {
+          for(auto sf : lookUpTable()[sc]) {
             CoarseningPolicy::projectionKernel(CoarseVec, _subspace[i], FineVec, sc, sf, i);
           }
         }
