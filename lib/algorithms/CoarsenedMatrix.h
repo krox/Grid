@@ -696,7 +696,10 @@ namespace Grid {
       FineScalarField iTmp(FineGrid);
       FineScalarField oTmp(FineGrid);
 
-      std::vector<Lattice<iScalar<vInteger> > > coor(_geom.npoint, FineGrid); // TODO: Can this be changed to a FineScalarField?
+      std::vector<Lattice<iScalar<vInteger> > > coor(_geom.npoint, FineGrid);
+
+      std::vector<CoarseningLookUpTable> iLut(_geom.npoint);
+      std::vector<CoarseningLookUpTable> oLut(_geom.npoint);
       PerfMonitors["Misc"].Stop();
 
       PerfMonitors["Orthogonalise"].Start();
@@ -723,6 +726,33 @@ namespace Grid {
       }
       PerfMonitors["LatticeCoord"].Stop(_geom.npoint);
 
+      PerfMonitors["PickBlocks"].Start();
+      ////////////////////////////////////////////////////////////////////////
+      // Pick out contributions coming from this cell and neighbour cell and put them in the lookup table
+      ////////////////////////////////////////////////////////////////////////
+      for(int p=0;p<_geom.npoint;p++) {
+        int dir  = _geom.directions[p];
+        int disp = _geom.displacements[p];
+        Integer block = (FineGrid->_rdimensions[dir]) / (Grid()->_rdimensions[dir]);
+        iLut[p].populate(Grid(), FineGrid);
+        oLut[p].populate(Grid(), FineGrid);
+        if(disp == 0) {
+          iTmp = one;
+          oTmp = zz;
+        } else if(disp == 1) {
+          oTmp = where(mod(coor[p], block) == (block - 1), one, zz);
+          iTmp = where(mod(coor[p], block) != (block - 1), one, zz);
+        } else if(disp == -1) {
+          oTmp = where(mod(coor[p], block) == (Integer)0, one, zz);
+          iTmp = where(mod(coor[p], block) != (Integer)0, one, zz);
+        } else {
+          assert(0);
+        }
+        iLut[p].deleteUnneededFineSites(iTmp);
+        oLut[p].deleteUnneededFineSites(oTmp);
+      }
+      PerfMonitors["PickBlocks"].Stop(_geom.npoint);
+
       for(int i = 0; i < Nbasis; i++) {
         PerfMonitors["Copy"].Start();
         extractChiralComponents<isTwoSpinVersion>(phiSplit, Aggregates._subspace[i]);
@@ -735,8 +765,6 @@ namespace Grid {
           PerfMonitors["Misc"].Start();
           int dir  = _geom.directions[p];
           int disp = _geom.displacements[p];
-
-          Integer block = (FineGrid->_rdimensions[dir]) / (Grid()->_rdimensions[dir]);
           PerfMonitors["Misc"].Stop();
 
           PerfMonitors["ApplyOp"].Start();
@@ -749,32 +777,10 @@ namespace Grid {
           }
           PerfMonitors["ApplyOp"].Stop(len);
 
-          ////////////////////////////////////////////////////////////////////////
-          // Pick out contributions coming from this cell and neighbour cell
-          ////////////////////////////////////////////////////////////////////////
-          PerfMonitors["PickBlocks"].Start();
-          CoarseningLookUpTable iLut(Grid(), FineGrid);
-          CoarseningLookUpTable oLut(Grid(), FineGrid);
-          if(disp == 0) {
-            iTmp = one;
-            oTmp = zz;
-          } else if(disp == 1) {
-            oTmp = where(mod(coor[p], block) == (block - 1), one, zz);
-            iTmp = where(mod(coor[p], block) != (block - 1), one, zz);
-          } else if(disp == -1) {
-            oTmp = where(mod(coor[p], block) == (Integer)0, one, zz);
-            iTmp = where(mod(coor[p], block) != (Integer)0, one, zz);
-          } else {
-            assert(0);
-          }
-          iLut.deleteUnneededFineSites(iTmp);
-          oLut.deleteUnneededFineSites(oTmp);
-          PerfMonitors["PickBlocks"].Stop();
-
           PerfMonitors["ProjectToSubspace"].Start();
           for(int k = 0; k < len; k++) {
-            Aggregates.ProjectToSubspace(iProjSplit[k], MphiSplit[k], iLut);
-            Aggregates.ProjectToSubspace(oProjSplit[k], MphiSplit[k], oLut);
+            Aggregates.ProjectToSubspace(iProjSplit[k], MphiSplit[k], iLut[p]);
+            Aggregates.ProjectToSubspace(oProjSplit[k], MphiSplit[k], oLut[p]);
           }
           PerfMonitors["ProjectToSubspace"].Stop(len*2);
 
