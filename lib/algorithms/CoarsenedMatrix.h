@@ -150,14 +150,17 @@ namespace Grid {
 
   };
 
-#define INHERIT_COARSENING_POLICY_TYPES(Policy)            \
-  typedef typename Policy::SiteSpinor       SiteSpinor;    \
-  typedef typename Policy::SiteLinkField    SiteLinkField; \
-  typedef typename Policy::SiteScalar       SiteScalar;    \
-  typedef typename Policy::FermionField     FermionField;  \
-  typedef typename Policy::LinkField        LinkField;     \
-  typedef typename Policy::ScalarField        ScalarField; \
-  typedef typename Policy::FineFermionField FineFermionField;
+#define INHERIT_COARSENING_POLICY_TYPES(Policy)               \
+  typedef typename Policy::SiteSpinor       SiteSpinor;       \
+  typedef typename Policy::SiteLinkField    SiteLinkField;    \
+  typedef typename Policy::SiteScalar       SiteScalar;       \
+  typedef typename Policy::FermionField     FermionField;     \
+  typedef typename Policy::LinkField        LinkField;        \
+  typedef typename Policy::ScalarField      ScalarField;      \
+  typedef typename Policy::FineSiteSpinor   FineSiteSpinor;   \
+  typedef typename Policy::FineSiteScalar   FineSiteScalar;   \
+  typedef typename Policy::FineFermionField FineFermionField; \
+  typedef typename Policy::FineScalarField  FineScalarField;
 
 #define INHERIT_COARSENING_POLICY_VARIABLES(Policy)         \
   using Policy::Ncs; \
@@ -204,6 +207,8 @@ namespace Grid {
 
     typedef _FineFermionField                              FineFermionField;
     typedef typename getVectorType<FineFermionField>::type FineSiteSpinor;
+    typedef typename FineSiteSpinor::tensor_reduced        FineSiteScalar;
+    typedef Lattice<FineSiteScalar>                        FineScalarField;
 
     /////////////////////////////////////////////
     // Member Functions
@@ -262,6 +267,8 @@ namespace Grid {
 
     typedef _FineFermionField                              FineFermionField;
     typedef typename getVectorType<FineFermionField>::type FineSiteSpinor;
+    typedef typename FineSiteSpinor::tensor_reduced        FineSiteScalar;
+    typedef Lattice<FineSiteScalar>                        FineScalarField;
 
     /////////////////////////////////////////////
     // Member Functions
