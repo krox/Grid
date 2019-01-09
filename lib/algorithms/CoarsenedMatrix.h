@@ -122,12 +122,13 @@ namespace Grid {
       std::cout<<std::endl;
     }
 
-    // int dirDispToPoint(int dir, int disp) {
-    //   if(dir == 0 and disp == 0)
-    //     return 2*_d;
-    //   else
-    //     return (_d * dir + 1 - disp) / 2;
-    // }
+    int PointFromDirDisp(int dir, int disp) {
+      int _d = (npoint - 1) / 2;
+      if(dir == 0 and disp == 0)
+        return 2*_d;
+      else
+        return (_d * dir + 1 - disp) / 2;
+    }
 
     /*
       // Original cleaner code
@@ -493,12 +494,7 @@ namespace Grid {
       SimpleCompressor<SiteSpinor> compressor;
       _stencil.HaloExchange(in, compressor);
 
-      auto point = [dir, disp]() { // TODO: This is ugly and should be changed
-                     if(dir == 0 and disp == 0)
-                       return 8;
-                     else
-                       return (4 * dir + 1 - disp) / 2;
-                   }();
+      auto point = _geom.PointFromDirDisp(dir, disp);
 
       parallel_for(int ss = 0; ss < Grid()->oSites(); ss++) {
         SiteSpinor    res = zero;
@@ -1079,12 +1075,7 @@ namespace Grid {
       SimpleCompressor<siteVector> compressor;
       Stencil.HaloExchange(in,compressor);
 
-      auto point = [dir, disp](){
-        if(dir == 0 and disp == 0)
-          return 8;
-        else
-          return (4 * dir + 1 - disp) / 2;
-      }();
+      auto point = geom.PointFromDirDisp(dir, disp);
 
       parallel_for(int ss=0;ss<Grid()->oSites();ss++){
         siteVector res = zero;
