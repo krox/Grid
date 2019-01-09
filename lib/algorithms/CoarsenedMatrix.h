@@ -124,6 +124,8 @@ namespace Grid {
 
     int PointFromDirDisp(int dir, int disp) {
       int _d = (npoint - 1) / 2;
+      assert(disp == -1 || disp == 0 || disp == 1);
+      assert(0 <= dir && dir < _d);
       if(dir == 0 and disp == 0)
         return 2*_d;
       else
