@@ -237,6 +237,10 @@ namespace Grid {
       else
         FineVec._odata[sf] = FineVec._odata[sf] + CoarseVec._odata[sc](i) * BasisVec._odata[sf];
     }
+
+    strong_inline void multLinkKernel(SiteSpinor & res, std::vector<LinkField> const & Y, SiteSpinor const & nbr, int point, int ss) {
+      res = res + Y[point]._odata[ss] * nbr;
+    }
   };
 
 
@@ -307,6 +311,11 @@ namespace Grid {
           FineVec._odata[sf]()(s) = FineVec._odata[sf]()(s) + CoarseTmp * BasisVec._odata[sf]()(s);
         }
       }
+    }
+
+    strong_inline void multLinkKernel(SiteSpinor & res, std::vector<LinkField> const & Y, SiteSpinor const & nbr, int point, int ss) {
+      //   res() = res() + Y._odata[ss](point) * nbr();
+      res = res + Y[point]._odata[ss] * nbr;
     }
   };
 
@@ -479,7 +488,7 @@ namespace Grid {
           } else {
             nbr = _stencil.CommBuf()[SE->_offset];
           }
-          res = res + _Y[point]._odata[ss] * nbr; // This could be changed to be similar to the Dirac operators with the TwoSpinPolicy
+          CoarseningPolicy::multLinkKernel(res, _Y, nbr, point, ss);
         }
         vstream(out._odata[ss], res);
       }
@@ -524,7 +533,7 @@ namespace Grid {
           nbr = _stencil.CommBuf()[SE->_offset];
         }
 
-        res = res + _Y[point]._odata[ss] * nbr; // This could be changed to be similar to the Dirac operators with the TwoSpinPolicy
+        CoarseningPolicy::multLinkKernel(res, _Y, nbr, point, ss);
 
         vstream(out._odata[ss], res);
       }
