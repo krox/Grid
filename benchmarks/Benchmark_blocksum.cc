@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
   auto FVolume = std::accumulate(FGrid->_fdimensions.begin(), FGrid->_fdimensions.end(), 1, std::multiplies<double>());
   auto CVolume = std::accumulate(CGrid->_fdimensions.begin(), CGrid->_fdimensions.end(), 1, std::multiplies<double>());
 
-  double flop = 1. * 2 * FSiteElems * FVolume;
+  double flop = 1. * (2 * FSiteElems) * FVolume;
   double byte = 1. * (2 * CSiteElems + 1 * FSiteElems) * FVolume * sizeof(Complex);
 
   CoarseningLookUpTable lookUpTable(CGrid, FGrid);

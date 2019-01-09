@@ -213,8 +213,8 @@ int main(int argc, char **argv) {
   //            Calculate performance figures for instrumentation            //
   /////////////////////////////////////////////////////////////////////////////
 
-  double nStencil         = oldCoarsenedMatrix._geom.npoint;
-  double nAccum           = nStencil;
+  double nStencil      = oldCoarsenedMatrix._geom.npoint;
+  double nAccum        = nStencil;
   double FSiteElems    = Nc * Ns;
   double oldCSiteElems = OldCoarsenedMatrix::Nbasis;
   double newCSiteElems = NewCoarsenedMatrix::Ncs * NewCoarsenedMatrix::Nbasis;
@@ -222,21 +222,21 @@ int main(int argc, char **argv) {
   double FVolume = std::accumulate(FGrid->_fdimensions.begin(), FGrid->_fdimensions.end(), 1, std::multiplies<double>());
   double CVolume = std::accumulate(CGrid->_fdimensions.begin(), CGrid->_fdimensions.end(), 1, std::multiplies<double>());
 
-  double flopOldM      = 1. * ((nStencil * (8 * oldCSiteElems * oldCSiteElems - 2 * oldCSiteElems) + nAccum * 2 * oldCSiteElems) * CVolume + 8 * oldCSiteElems * CVolume);
-  double byteOldM      = 1. * ((nStencil * (oldCSiteElems * oldCSiteElems + oldCSiteElems) + oldCSiteElems) * CVolume * sizeof(Complex) + oldCSiteElems * CVolume * sizeof(Complex));
-  double footprintOldM = 1. * ((2 * oldCSiteElems + nStencil * oldCSiteElems * oldCSiteElems) * CVolume * sizeof(Complex));
+  double flopOldM      = 1. * ((nStencil * (8 * oldCSiteElems * oldCSiteElems - 2 * oldCSiteElems) + nAccum * 2 * oldCSiteElems) + 8 * oldCSiteElems) * CVolume;
+  double byteOldM      = 1. * ((nStencil * (oldCSiteElems * oldCSiteElems + oldCSiteElems) + oldCSiteElems) + oldCSiteElems) * CVolume * sizeof(Complex);
+  double footprintOldM = 1. * (2 * oldCSiteElems + nStencil * oldCSiteElems * oldCSiteElems) * CVolume * sizeof(Complex);
 
-  double flopNewM      = 1. * ((nStencil * (8 * newCSiteElems * newCSiteElems - 2 * newCSiteElems) + nAccum * 2 * newCSiteElems) * CVolume + 8 * newCSiteElems * CVolume);
-  double byteNewM      = 1. * ((nStencil * (newCSiteElems * newCSiteElems + newCSiteElems) + newCSiteElems) * CVolume * sizeof(Complex) + newCSiteElems * CVolume * sizeof(Complex));
-  double footprintNewM = 1. * ((2 * newCSiteElems + nStencil * newCSiteElems * newCSiteElems) * CVolume * sizeof(Complex));
+  double flopNewM      = 1. * ((nStencil * (8 * newCSiteElems * newCSiteElems - 2 * newCSiteElems) + nAccum * 2 * newCSiteElems) + 8 * newCSiteElems) * CVolume;
+  double byteNewM      = 1. * ((nStencil * (newCSiteElems * newCSiteElems + newCSiteElems) + newCSiteElems) + newCSiteElems) * CVolume * sizeof(Complex);
+  double footprintNewM = 1. * (2 * newCSiteElems + nStencil * newCSiteElems * newCSiteElems) * CVolume * sizeof(Complex);
 
-  double flopOldMdir      = 1. * ((8 * oldCSiteElems * oldCSiteElems - 2 * oldCSiteElems) * CVolume);
-  double byteOldMdir      = 1. * ((oldCSiteElems * oldCSiteElems + 2 * oldCSiteElems) * CVolume * sizeof(Complex));
-  double footprintOldMdir = 1. * ((2 * oldCSiteElems + nStencil * oldCSiteElems * oldCSiteElems) * CVolume * sizeof(Complex));
+  double flopOldMdir      = 1. * (8 * oldCSiteElems * oldCSiteElems - 2 * oldCSiteElems) * CVolume;
+  double byteOldMdir      = 1. * (oldCSiteElems * oldCSiteElems + 2 * oldCSiteElems) * CVolume * sizeof(Complex);
+  double footprintOldMdir = 1. * (2 * oldCSiteElems + nStencil * oldCSiteElems * oldCSiteElems) * CVolume * sizeof(Complex);
 
-  double flopNewMdir      = 1. * ((8 * newCSiteElems * newCSiteElems - 2 * newCSiteElems) * CVolume);
-  double byteNewMdir      = 1. * ((newCSiteElems * newCSiteElems + 2 * newCSiteElems) * CVolume * sizeof(Complex));
-  double footprintNewMdir = 1. * ((2 * newCSiteElems + nStencil * newCSiteElems * newCSiteElems) * CVolume * sizeof(Complex));
+  double flopNewMdir      = 1. * (8 * newCSiteElems * newCSiteElems - 2 * newCSiteElems) * CVolume;
+  double byteNewMdir      = 1. * (newCSiteElems * newCSiteElems + 2 * newCSiteElems) * CVolume * sizeof(Complex);
+  double footprintNewMdir = 1. * (2 * newCSiteElems + nStencil * newCSiteElems * newCSiteElems) * CVolume * sizeof(Complex);
 
   double flopOldMdiag      = flopOldMdir;
   double byteOldMdiag      = byteOldMdir;
@@ -246,20 +246,20 @@ int main(int argc, char **argv) {
   double byteNewMdiag      = byteNewMdir;
   double footprintNewMdiag = footprintNewMdir;
 
-  double flopOldProject      = 1. * (8 * FSiteElems * nBasis * FVolume);
-  double byteOldProject      = 1. * ((2 * 1 + 2 * FSiteElems) * nBasis * FVolume * sizeof(Complex));
+  double flopOldProject      = 1. * (8 * FSiteElems) * nBasis * FVolume;
+  double byteOldProject      = 1. * (2 * 1 + 2 * FSiteElems) * nBasis * FVolume * sizeof(Complex);
   double footprintOldProject = -1.;
 
-  double flopNewProject      = 1. * (8 * FSiteElems * nB * FVolume);
-  double byteNewProject      = 1. * ((2 * 1 + 2 * FSiteElems) * nB * FVolume * sizeof(Complex));
+  double flopNewProject      = 1. * (8 * FSiteElems) * nB * FVolume;
+  double byteNewProject      = 1. * (2 * 1 + 2 * FSiteElems) * nB * FVolume * sizeof(Complex);
   double footprintNewProject = -1.;
 
-  double flopOldPromote      = 1. * ((8 * (nBasis - 1) + 6) * FSiteElems * FVolume);
-  double byteOldPromote      = 1. * (((1 * 1 + 3 * FSiteElems) * (nBasis - 1) + (1 * 1 + 2 * FSiteElems) * 1) * FVolume * sizeof(Complex));
+  double flopOldPromote      = 1. * (8 * (nBasis - 1) + 6) * FSiteElems * FVolume;
+  double byteOldPromote      = 1. * ((1 * 1 + 3 * FSiteElems) * (nBasis - 1) + (1 * 1 + 2 * FSiteElems) * 1) * FVolume * sizeof(Complex);
   double footprintOldPromote = 1. * (-1);
 
-  double flopNewPromote      = 1. * ((8 * (nB - 1) + 6) * FSiteElems * FVolume);
-  double byteNewPromote      = 1. * (((1 * 1 + 3 * FSiteElems) * (nB - 1) + (1 * 1 + 2 * FSiteElems) * 1) * FVolume * sizeof(Complex));
+  double flopNewPromote      = 1. * (8 * (nB - 1) + 6) * FSiteElems * FVolume;
+  double byteNewPromote      = 1. * ((1 * 1 + 3 * FSiteElems) * (nB - 1) + (1 * 1 + 2 * FSiteElems) * 1) * FVolume * sizeof(Complex);
   double footprintNewPromote = -1.;
 
   std::cout << GridLogMessage << "***************************************************************************" << std::endl;

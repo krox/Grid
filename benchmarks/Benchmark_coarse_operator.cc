@@ -78,8 +78,8 @@ int main(int argc, char **argv) {
 
   auto CVolume = std::accumulate(CGrid->_fdimensions.begin(), CGrid->_fdimensions.end(), 1, std::multiplies<double>());
 
-  double flopM      = 1. * (nStencil * (8 * CSiteElems * CSiteElems - 2 * CSiteElems) + nAccum * 2 * CSiteElems) * CVolume + 8 * CSiteElems * CVolume;
-  double byteM      = 1. * (nStencil * (CSiteElems * CSiteElems + CSiteElems) + CSiteElems) * CVolume * sizeof(Complex) + CSiteElems * CVolume * sizeof(Complex);
+  double flopM      = 1. * ((nStencil * (8 * CSiteElems * CSiteElems - 2 * CSiteElems) + nAccum * 2 * CSiteElems) + (8 * CSiteElems)) * CVolume;
+  double byteM      = 1. * ((nStencil * (CSiteElems * CSiteElems + CSiteElems) + CSiteElems) + CSiteElems) * CVolume * sizeof(Complex);
   double footprintM = 1. * (2 * CSiteElems + nStencil * CSiteElems * CSiteElems) * CVolume * sizeof(Complex);
 
   double flopMdir      = 1. * (8 * CSiteElems * CSiteElems - 2 * CSiteElems) * CVolume;
