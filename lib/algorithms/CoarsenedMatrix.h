@@ -130,6 +130,10 @@ namespace Grid {
         return (_d * dir + 1 - disp) / 2;
     }
 
+    int SelfStencilPoint() {
+      return npoint - 1;
+    }
+
     /*
       // Original cleaner code
     Geometry(int _d) : dimension(_d), npoint(2*_d+1), directions(npoint), displacements(npoint) {
@@ -559,14 +563,10 @@ namespace Grid {
       PerfMonitors["Misc"].Start();
       // Compute the matrix elements of linop between this orthonormal
       // set of vectors.
-      int self_stencil = -1;
+      int self_stencil = _geom.SelfStencilPoint();
       for(int p = 0; p < _geom.npoint; p++) {
         _Y[p] = zero;
-        if(_geom.displacements[p] == 0) {
-          self_stencil = p;
-        }
       }
-      assert(self_stencil != -1);
       PerfMonitors["Misc"].Stop();
 
       for(int i = 0; i < Nbasis; i++) {
@@ -706,14 +706,10 @@ namespace Grid {
       PerfMonitors["Misc"].Start();
       // Compute the matrix elements of linop between this orthonormal
       // set of vectors.
-      int self_stencil = -1;
+      int self_stencil = _geom.SelfStencilPoint();
       for(int p = 0; p < _geom.npoint; p++) {
         _Y[p] = zero;
-        if(_geom.displacements[p] == 0) {
-          self_stencil = p;
-        }
       }
-      assert(self_stencil != -1);
       PerfMonitors["Misc"].Stop();
 
       PerfMonitors["LatticeCoord"].Start();
@@ -1140,15 +1136,11 @@ namespace Grid {
       timers["Misc"].Start();
       // Compute the matrix elements of linop between this orthonormal
       // set of vectors.
-      int self_stencil=-1;
+      int self_stencil = geom.SelfStencilPoint();
       for(int p=0;p<geom.npoint;p++){ 
 	A[p]=zero;
-	if( geom.displacements[p]==0){
-	  self_stencil=p;
-	}
         block[p]=(FineGrid->_rdimensions[geom.directions[p]])/(Grid()->_rdimensions[geom.directions[p]]);
       }
-      assert(self_stencil!=-1);
       timers["Misc"].Stop();
 
       timers["LatticeCoordinate"].Start();
