@@ -491,7 +491,13 @@ namespace Grid {
       return RealD();
     }
 
-    void Mdiag(const FermionField &in, FermionField &out){ return Mdir(in, out, 0, 0); }
+    void Mdiag(const FermionField &in, FermionField &out){
+      // use the self-coupling point of the stencil
+      auto p    = _geom.SelfStencilPoint();
+      auto dir  = _geom.directions[p];
+      auto disp = _geom.displacements[p];
+      Mdir(in, out, dir, disp);
+    }
 
     void Mdir(const FermionField &in, FermionField &out, int dir, int disp) {
       conformable(Grid(), in._grid);
@@ -1098,7 +1104,11 @@ namespace Grid {
     };
 
     void Mdiag(const CoarseVector &in, CoarseVector &out){
-      Mdir(in, out, 0, 0); // use the self coupling (= last) point of the stencil
+      // use the self-coupling point of the stencil
+      auto p    = geom.SelfStencilPoint();
+      auto dir  = geom.directions[p];
+      auto disp = geom.displacements[p];
+      return Mdir(in, out, dir, disp);
     };
 
     CoarsenedMatrix(GridCartesian &CoarseGrid) 	: 
