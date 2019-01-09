@@ -130,3 +130,8 @@ lib/version.h
 .vscode/
 .vscode/settings.json
 settings.json
+
+# emacs language server cache directories #
+###########################################
+.ccls-cache
+.cquery_cached_index
