@@ -34,15 +34,6 @@ Author: paboyle <paboyle@ph.ed.ac.uk>
 
 namespace Grid {
 
-  void printPerformanceMonitors(std::map<std::string, GridPerfMonitor> &perfMonitors) {
-    for(auto & elem: perfMonitors)
-      std::cout << GridLogPerformance << "Kernel "
-                << std::setw(25) << std::right
-                << elem.first << ": " << elem.second
-                << " Fraction[%] = "
-                << std::fixed
-                << 100 * elem.second.Seconds() / perfMonitors["Total"].Seconds() << std::endl;
-  }
 
   class TimeProfiler {
   public:
@@ -818,6 +809,18 @@ namespace Grid {
 
     void CoarsenOperator(GridBase *FineGrid, LinearOperatorBase<FineFermionField> &linop, AggregationUsingPolicies<CoarseningPolicy> &Aggregates) {
       doOperatorCoarsening<CoarseningPolicy::isTwoSpinVersion>(FineGrid, linop, Aggregates);
+    }
+
+
+  private:
+    void printPerformanceMonitors(std::map<std::string, GridPerfMonitor> &perfMonitors) {
+      for(auto & elem: perfMonitors)
+        std::cout << GridLogPerformance << "Kernel "
+                  << std::setw(25) << std::right
+                  << elem.first << ": " << elem.second
+                  << " Fraction[%] = "
+                  << std::fixed
+                  << 100 * elem.second.Seconds() / perfMonitors["Total"].Seconds() << std::endl;
     }
   };
 
