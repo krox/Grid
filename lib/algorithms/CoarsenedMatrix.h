@@ -32,6 +32,8 @@ Author: paboyle <paboyle@ph.ed.ac.uk>
 #define  GRID_ALGORITHM_COARSENED_MATRIX_H
 
 
+#define SAVE_DIRECTIONS
+
 namespace Grid {
 
 
@@ -534,16 +536,19 @@ namespace Grid {
     template<bool isTwoSpinVersion, typename std::enable_if<isTwoSpinVersion == false>::type * = nullptr>
     void doOperatorCoarsening(GridBase *FineGrid, LinearOperatorBase<FineFermionField> &linop, AggregationUsingPolicies<CoarseningPolicy> &Aggregates) {
       std::map<std::string, GridPerfMonitor> PerfMonitors {
-                                                           {"Total" , GridPerfMonitor()},
-                                                           {"Misc" , GridPerfMonitor()},
-                                                           {"Orthogonalise" , GridPerfMonitor()},
-                                                           {"Copy" , GridPerfMonitor()},
-                                                           {"LatticeCoord" , GridPerfMonitor()},
-                                                           {"ApplyOp" , GridPerfMonitor()},
-                                                           {"PickBlocks" , GridPerfMonitor()},
-                                                           {"ProjectToSubspace" , GridPerfMonitor()},
-                                                           {"ConstructLinks" , GridPerfMonitor()}
-                                                           };
+                                                          {"Total" , GridPerfMonitor()},
+                                                          {"Misc" , GridPerfMonitor()},
+                                                          {"Orthogonalise" , GridPerfMonitor()},
+                                                          {"Copy" , GridPerfMonitor()},
+                                                          {"LatticeCoord" , GridPerfMonitor()},
+                                                          {"ApplyOp" , GridPerfMonitor()},
+                                                          {"PickBlocks" , GridPerfMonitor()},
+                                                          {"ProjectToSubspace" , GridPerfMonitor()},
+                                                          {"ConstructLinks" , GridPerfMonitor()},
+#if defined(SAVE_DIRECTIONS)
+                                                          {"ShiftLinks" , GridPerfMonitor()}
+#endif
+                                                          };
 
       PerfMonitors["Total"].Start();
       PerfMonitors["Misc"].Start();
@@ -672,16 +677,19 @@ namespace Grid {
     template<bool isTwoSpinVersion, typename std::enable_if<isTwoSpinVersion == true>::type *  = nullptr>
     void doOperatorCoarsening(GridBase *FineGrid, LinearOperatorBase<FineFermionField> &linop, AggregationUsingPolicies<CoarseningPolicy> &Aggregates) {
       std::map<std::string, GridPerfMonitor> PerfMonitors {
-                                                           {"Total" , GridPerfMonitor()},
-                                                           {"Misc" , GridPerfMonitor()},
-                                                           {"Orthogonalise" , GridPerfMonitor()},
-                                                           {"Copy" , GridPerfMonitor()},
-                                                           {"LatticeCoord" , GridPerfMonitor()},
-                                                           {"ApplyOp" , GridPerfMonitor()},
-                                                           {"PickBlocks" , GridPerfMonitor()},
-                                                           {"ProjectToSubspace" , GridPerfMonitor()},
-                                                           {"ConstructLinks" , GridPerfMonitor()}
-      };
+                                                          {"Total", GridPerfMonitor()},
+                                                          {"Misc", GridPerfMonitor()},
+                                                          {"Orthogonalise", GridPerfMonitor()},
+                                                          {"Copy", GridPerfMonitor()},
+                                                          {"LatticeCoord", GridPerfMonitor()},
+                                                          {"ApplyOp", GridPerfMonitor()},
+                                                          {"PickBlocks", GridPerfMonitor()},
+                                                          {"ProjectToSubspace", GridPerfMonitor()},
+                                                          {"ConstructLinks", GridPerfMonitor()},
+#if defined(SAVE_DIRECTIONS)
+                                                          {"ShiftLinks", GridPerfMonitor()}
+#endif
+                                                          };
 
       PerfMonitors["Total"].Start();
       PerfMonitors["Misc"].Start();
@@ -762,6 +770,10 @@ namespace Grid {
 
         for(int p = 0; p < _geom.npoint; p++) {
 
+#if defined(SAVE_DIRECTIONS)
+          if(_geom.displacements[p] >= 0) {
+            // std::cout << "Starting coarse op construction loop for i = " << i << " p = " << p << std::endl;
+#endif
           PerfMonitors["Misc"].Start();
           int dir  = _geom.directions[p];
           int disp = _geom.displacements[p];
@@ -798,11 +810,46 @@ namespace Grid {
             }
           }
           PerfMonitors["ConstructLinks"].Stop();
+#if defined(SAVE_DIRECTIONS)
+          }
+#endif
         }
       }
+
+#if defined(SAVE_DIRECTIONS)
+      // This is the version for the old layout of Y
+      // Relation between forward and backward link matrices taken from M. Rottmann's PHD thesis
+      PerfMonitors["ShiftLinks"].Start();
+      for(int p = 0; p < _geom.npoint; p++) {
+        if(_geom.displacements[p] == +1) {
+          auto tmp = _Y[p];
+          tmp = adj(tmp);
+          parallel_for(auto ss=tmp.begin();ss<tmp.end();ss++){ // TODO: Is there fancier way to do this?
+            Real factor;
+            for(int k = 0; k < len; k++) {
+              for(int l = 0; l < len; l++) {
+                if((k + l) % 2 == 1) {
+                  factor = -1.;
+                } else {
+                  factor = 1.;
+                }
+                tmp._odata[ss]()(k,l) = factor * tmp._odata[ss]()(k,l);
+              }
+            }
+          }
+          _Y[p+1] = Cshift(tmp, _geom.directions[p], -1);
+        }
+      }
+      PerfMonitors["ShiftLinks"].Stop();
+
+      std::string saveDirections = "true";
+#else
+      std::string saveDirections = "false";
+#endif
+
       PerfMonitors["Total"].Stop();
       std::cout << GridLogMessage << "***************************************************************************" << std::endl;
-      std::cout << GridLogMessage << "Time breakdown for CoarsenOperator with isTwoSpinVersion == true" << std::endl;
+      std::cout << GridLogMessage << "Time breakdown for CoarsenOperator with isTwoSpinVersion == true and saveDirections = " << saveDirections << std::endl;
       std::cout << GridLogMessage << "***************************************************************************" << std::endl;
       printPerformanceMonitors(PerfMonitors);
     }
