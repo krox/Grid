@@ -668,7 +668,7 @@ namespace Grid {
       parallel_for(int ss = 0; ss < in._grid->oSites(); ss++) {
         for(int s = 0; s < Nfs; s++) {
           auto tmp = peekIndex<SpinIndex>(in._odata[ss], s);
-            pokeIndex<SpinIndex>(extracted[s/Nsb]._odata[ss], tmp, s);
+          pokeIndex<SpinIndex>(extracted[s/Nsb]._odata[ss], tmp, s);
         }
       }
 #undef SpinIndex
