@@ -773,7 +773,73 @@ namespace Grid {
 #if defined(SAVE_DIRECTIONS)
           if(_geom.displacements[p] >= 0) {
             // std::cout << "Starting coarse op construction loop for i = " << i << " p = " << p << std::endl;
-#endif
+            PerfMonitors["Misc"].Start();
+            int dir  = _geom.directions[p];
+            int disp = _geom.displacements[p];
+            PerfMonitors["Misc"].Stop();
+
+            PerfMonitors["ApplyOp"].Start();
+            if(disp == 0) {
+              for(int k = 0; k < len; k++) linop.OpDiag(phiSplit[k], MphiSplit[k]);
+            } else {
+              for(int k = 0; k < len; k++) linop.OpDir(phiSplit[k], MphiSplit[k], dir, disp);
+            }
+            PerfMonitors["ApplyOp"].Stop(len);
+
+            PerfMonitors["ProjectToSubspace"].Start();
+            for(int k = 0; k < len; k++) {
+              Aggregates.ProjectToSubspace(
+                iProjSplit[k],
+                MphiSplit[k],
+                iLut[p]); // TODO: Think about a function to project both at the same time to save running over the lattice twice
+              Aggregates.ProjectToSubspace(oProjSplit[k], MphiSplit[k], oLut[p]);
+            }
+            PerfMonitors["ProjectToSubspace"].Stop(
+              len * 2); // TODO: This counts the number of calls, but these are no full restrictions any longer -> Think about what number to put here
+
+            PerfMonitors["ConstructLinks"].Start();
+            parallel_for(int ss = 0; ss < Grid()->oSites(); ss++) {
+              for(int j = 0; j < Nbasis; j++) {
+                if(disp != 0) {
+                  for(int k = 0; k < len; k++)
+                    for(int l = 0; l < len; l++) _Y[p]._odata[ss]()(l, k)(j, i) = oProjSplit[k]._odata[ss]()(l)(j);
+                }
+                for(int k = 0; k < len; k++)
+                  for(int l = 0; l < len; l++)
+                    _Y[self_stencil]._odata[ss]()(l, k)(j, i) = _Y[self_stencil]._odata[ss]()(l, k)(j, i) + iProjSplit[k]._odata[ss]()(l)(j);
+              }
+            }
+            PerfMonitors["ConstructLinks"].Stop();
+          }
+        }
+      }
+      // This is the version for the old layout of Y
+      // Relation between forward and backward link matrices taken from M. Rottmann's PHD thesis
+      PerfMonitors["ShiftLinks"].Start();
+      for(int p = 0; p < _geom.npoint; p++) {
+        if(_geom.displacements[p] == +1) {
+          auto tmp = _Y[p];
+          tmp      = adj(tmp);
+          parallel_for(auto ss = tmp.begin(); ss < tmp.end(); ss++) { // TODO: Is there fancier way to do this?
+            Real factor;
+            for(int k = 0; k < len; k++) {
+              for(int l = 0; l < len; l++) {
+                if((k + l) % 2 == 1) {
+                  factor = -1.;
+                } else {
+                  factor = 1.;
+                }
+                tmp._odata[ss]()(k, l) = factor * tmp._odata[ss]()(k, l);
+              }
+            }
+          }
+          _Y[p + 1] = Cshift(tmp, _geom.directions[p], -1);
+        }
+      }
+      PerfMonitors["ShiftLinks"].Stop();
+
+      std::string saveDirections = "true";
+#else
           PerfMonitors["Misc"].Start();
           int dir  = _geom.directions[p];
           int disp = _geom.displacements[p];
@@ -810,40 +876,8 @@ namespace Grid {
             }
           }
           PerfMonitors["ConstructLinks"].Stop();
-#if defined(SAVE_DIRECTIONS)
-          }
-#endif
         }
       }
-
-#if defined(SAVE_DIRECTIONS)
-      // This is the version for the old layout of Y
-      // Relation between forward and backward link matrices taken from M. Rottmann's PHD thesis
-      PerfMonitors["ShiftLinks"].Start();
-      for(int p = 0; p < _geom.npoint; p++) {
-        if(_geom.displacements[p] == +1) {
-          auto tmp = _Y[p];
-          tmp = adj(tmp);
-          parallel_for(auto ss=tmp.begin();ss<tmp.end();ss++){ // TODO: Is there fancier way to do this?
-            Real factor;
-            for(int k = 0; k < len; k++) {
-              for(int l = 0; l < len; l++) {
-                if((k + l) % 2 == 1) {
-                  factor = -1.;
-                } else {
-                  factor = 1.;
-                }
-                tmp._odata[ss]()(k,l) = factor * tmp._odata[ss]()(k,l);
-              }
-            }
-          }
-          _Y[p+1] = Cshift(tmp, _geom.directions[p], -1);
-        }
-      }
-      PerfMonitors["ShiftLinks"].Stop();
-
-      std::string saveDirections = "true";
-#else
       std::string saveDirections = "false";
 #endif
 
