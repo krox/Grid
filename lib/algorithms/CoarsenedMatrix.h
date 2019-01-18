@@ -37,49 +37,6 @@ Author: paboyle <paboyle@ph.ed.ac.uk>
 namespace Grid {
 
 
-  class TimeProfiler {
-  public:
-    std::string Prefix;
-    std::map<std::string, GridStopWatch> StopWatches;
-
-    TimeProfiler() = default;
-
-    TimeProfiler(std::string const& prefix, std::vector<std::string> const &names)
-      : Prefix(prefix) {
-      for(auto &elem : names)
-        StopWatches[elem] = GridStopWatch();
-      Reset();
-    }
-
-    void Reset() {
-      for(auto &elem : StopWatches)
-        elem.second.Reset();
-    }
-
-    void Report(GridLogger & logger) {
-      double timeTotal = 0;
-      if(StopWatches.find("Total") != StopWatches.end()) {
-        timeTotal = StopWatches["Total"].useconds();
-      } else {
-        for(auto &elem : StopWatches)
-          timeTotal += elem.second.useconds();
-      }
-
-      for(auto &elem : StopWatches) {
-        double timeElem = elem.second.useconds();
-        std::cout << logger << "Time elapsed: "
-                  << Prefix << " -- "
-                  << elem.first << " " << elem.second.Elapsed()
-                  << " (" << std::defaultfloat << timeElem / timeTotal * 100 << "%)" << std::endl;
-      }
-    }
-
-    GridStopWatch & operator[](std::string const &name) {
-      return StopWatches[name];
-    }
-  };
-
-
   class Geometry {
     //    int dimension;
   public:
