@@ -36,6 +36,11 @@ Author: paboyle <paboyle@ph.ed.ac.uk>
 
 namespace Grid {
 
+  void printPerformanceMonitors(std::map<std::string, GridPerfMonitor> &perfMonitors) {
+    for(auto &elem : perfMonitors)
+      std::cout << GridLogPerformance << "Kernel " << std::setw(25) << std::right << elem.first << ": " << elem.second
+                << " Fraction[%] = " << std::fixed << 100 * elem.second.Seconds() / perfMonitors["Total"].Seconds() << std::endl;
+  }
 
   class Geometry {
     //    int dimension;
@@ -855,16 +860,6 @@ namespace Grid {
     }
 
 
-  private:
-    void printPerformanceMonitors(std::map<std::string, GridPerfMonitor> &perfMonitors) {
-      for(auto & elem: perfMonitors)
-        std::cout << GridLogPerformance << "Kernel "
-                  << std::setw(25) << std::right
-                  << elem.first << ": " << elem.second
-                  << " Fraction[%] = "
-                  << std::fixed
-                  << 100 * elem.second.Seconds() / perfMonitors["Total"].Seconds() << std::endl;
-    }
   };
 
   //////////////////////////////////////////////////////////////////////////////////////////
@@ -1143,6 +1138,21 @@ namespace Grid {
     void CoarsenOperator(GridBase *FineGrid,LinearOperatorBase<Lattice<Fobj> > &linop,
 			 Aggregation<Fobj,CComplex,nbasis> & Subspace){
 
+      std::map<std::string, GridPerfMonitor> PerfMonitors {
+                                                          {"Total" , GridPerfMonitor()},
+                                                          {"Misc" , GridPerfMonitor()},
+                                                          {"Orthogonalise" , GridPerfMonitor()},
+                                                          {"Copy" , GridPerfMonitor()},
+                                                          {"LatticeCoord" , GridPerfMonitor()},
+                                                          {"ApplyOp" , GridPerfMonitor()},
+                                                          {"PickBlocks" , GridPerfMonitor()},
+                                                          {"ProjectToSubspace" , GridPerfMonitor()},
+                                                          {"ConstructLinks" , GridPerfMonitor()}
+                                                          };
+
+      PerfMonitors["Total"].Start();
+      PerfMonitors["Misc"].Start();
+
       FineField iblock(FineGrid); // contributions from within this block
       FineField oblock(FineGrid); // contributions from outwith this block
 
@@ -1156,10 +1166,14 @@ namespace Grid {
       CoarseVector iProj(Grid()); 
       CoarseVector oProj(Grid()); 
       CoarseScalar InnerProd(Grid()); 
+      PerfMonitors["Misc"].Stop();
 
+      PerfMonitors["Orthogonalise"].Start();
       // Orthogonalise the subblocks over the basis
       blockOrthogonalise(InnerProd,Subspace.subspace);
+      PerfMonitors["Orthogonalise"].Stop();
 
+      PerfMonitors["Misc"].Start();
       // Compute the matrix elements of linop between this orthonormal
       // set of vectors.
       int self_stencil=-1;
@@ -1170,31 +1184,41 @@ namespace Grid {
 	}
       }
       assert(self_stencil!=-1);
+      PerfMonitors["Misc"].Stop();
 
       for(int i=0;i<nbasis;i++){
+        PerfMonitors["Copy"].Start();
 	phi=Subspace.subspace[i];
-	
+        PerfMonitors["Copy"].Stop();
+
 	std::cout<<GridLogMessage<<"("<<i<<").."<<std::endl;
 
 	for(int p=0;p<geom.npoint;p++){ 
 
+          PerfMonitors["Misc"].Start();
 	  int dir   = geom.directions[p];
 	  int disp  = geom.displacements[p];
 
 	  Integer block=(FineGrid->_rdimensions[dir])/(Grid()->_rdimensions[dir]);
+          PerfMonitors["Misc"].Stop();
 
+          PerfMonitors["LatticeCoord"].Start();
 	  LatticeCoordinate(coor,dir);
+          PerfMonitors["LatticeCoord"].Stop();
 
+          PerfMonitors["ApplyOp"].Start();
 	  if ( disp==0 ){
 	    linop.OpDiag(phi,Mphi);
 	  }
 	  else  {
 	    linop.OpDir(phi,Mphi,dir,disp); 
 	  }
+          PerfMonitors["ApplyOp"].Stop();
 
 	  ////////////////////////////////////////////////////////////////////////
 	  // Pick out contributions coming from this cell and neighbour cell
 	  ////////////////////////////////////////////////////////////////////////
+          PerfMonitors["PickBlocks"].Start();
 	  if ( disp==0 ) {
 	    iblock = Mphi;
 	    oblock = zero;
@@ -1207,12 +1231,17 @@ namespace Grid {
 	  } else {
 	    assert(0);
 	  }
+          PerfMonitors["PickBlocks"].Stop();
 
-	  Subspace.ProjectToSubspace(iProj,iblock);
+          PerfMonitors["ProjectToSubspace"].Start();
+	  Subspace.ProjectToSubspace(iProj, iblock);
 	  Subspace.ProjectToSubspace(oProj,oblock);
 	  //	  blockProject(iProj,iblock,Subspace.subspace);
 	  //	  blockProject(oProj,oblock,Subspace.subspace);
-	  parallel_for(int ss=0;ss<Grid()->oSites();ss++){
+          PerfMonitors["ProjectToSubspace"].Stop(2);
+
+          PerfMonitors["ConstructLinks"].Start();
+	  parallel_for(int ss = 0; ss < Grid()->oSites(); ss++) {
 	    for(int j=0;j<nbasis;j++){
 	      if( disp!= 0 ) {
 		A[p]._odata[ss](j,i) = oProj._odata[ss](j);
@@ -1220,8 +1249,14 @@ namespace Grid {
 	      A[self_stencil]._odata[ss](j,i) =	A[self_stencil]._odata[ss](j,i) + iProj._odata[ss](j);
 	    }
 	  }
+          PerfMonitors["ConstructLinks"].Stop();
 	}
       }
+      PerfMonitors["Total"].Stop();
+      std::cout << GridLogMessage << "***************************************************************************" << std::endl;
+      std::cout << GridLogMessage << "Time breakdown for CoarsenOperator for original implementation" << std::endl;
+      std::cout << GridLogMessage << "***************************************************************************" << std::endl;
+      printPerformanceMonitors(PerfMonitors);
 
 #if 0
       ///////////////////////////
