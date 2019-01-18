@@ -88,7 +88,7 @@ namespace Grid {
     std::vector<int> displacements;
 
   Geometry(int _d)  {
-
+  
       int base = (_d==5) ? 1:0;
 
       // make coarse grid stencil for 4d , not 5d
@@ -105,7 +105,7 @@ namespace Grid {
       }
       directions   [2*_d]=0;
       displacements[2*_d]=0;
-
+      
       //// report back
       std::cout<<GridLogMessage<<"directions    :";
       for(int d=0;d<npoint;d++) std::cout<< directions[d]<< " ";
@@ -114,7 +114,7 @@ namespace Grid {
       for(int d=0;d<npoint;d++) std::cout<< displacements[d]<< " ";
       std::cout<<std::endl;
     }
-
+  
     int PointFromDirDisp(int dir, int disp) {
       int _d = (npoint - 1) / 2;
       assert(disp == -1 || disp == 0 || disp == 1);
@@ -146,10 +146,10 @@ namespace Grid {
       delta[directions[point]] = displacements[point];
       return delta;
     };
-    */
+    */    
 
   };
-
+  
 #define INHERIT_COARSENING_POLICY_TYPES(Policy)               \
   typedef typename Policy::SiteSpinor       SiteSpinor;       \
   typedef typename Policy::SiteLinkField    SiteLinkField;    \
@@ -930,15 +930,13 @@ namespace Grid {
     std::vector<Lattice<Fobj> > subspace;
     int checkerboard;
 
-    TimeProfiler timers;
-
   Aggregation(GridBase *_CoarseGrid,GridBase *_FineGrid,int _checkerboard) : 
     CoarseGrid(_CoarseGrid),
       FineGrid(_FineGrid),
       subspace(nbasis,_FineGrid),
-      checkerboard(_checkerboard),
-      timers("Aggregation.CreateSubspace", {"Orthogonalise", "CreateVectors"})
-	{};
+      checkerboard(_checkerboard)
+	{
+	};
   
     void Orthogonalise(void){
       CoarseScalar InnerProd(CoarseGrid); 
@@ -975,8 +973,7 @@ namespace Grid {
 	random(RNG,subspace[i]);
 	std::cout<<GridLogMessage<<" norm subspace["<<i<<"] "<<norm2(subspace[i])<<std::endl;
       }
-      Orthogonalise()
-;
+      Orthogonalise();
     }
 
     /*
@@ -1031,23 +1028,18 @@ namespace Grid {
     */
     virtual void CreateSubspace(GridParallelRNG  &RNG,LinearOperatorBase<FineField> &hermop,int nn=nbasis) {
 
-      timers["Total"].Start();
-      timers["CreateVectors"].Start();
       RealD scale;
 
       ConjugateGradient<FineField> CG(1.0e-2,10000);
       FineField noise(FineGrid);
       FineField Mn(FineGrid);
 
-
       for(int b=0;b<nn;b++){
-
-        timers["uiae"].Start();
+	
 	subspace[b] = zero;
 	gaussian(RNG,noise);
 	scale = std::pow(norm2(noise),-0.5); 
 	noise=noise*scale;
-        timers["uiae"].Stop();
 
 	hermop.Op(noise,Mn); std::cout<<GridLogMessage << "noise   ["<<b<<"] <n|MdagM|n> "<<norm2(Mn)<<std::endl;
 
@@ -1065,17 +1057,11 @@ namespace Grid {
 	subspace[b]   = noise;
 
       }
-      timers["CreateVectors"].Stop();
 
-      timers["Orthogonalise"].Start();
       Orthogonalise();
-      timers["Orthogonalise"].Stop();
 
-      timers["Total"].Stop();
     }
   };
-
-
   // Fine Object == (per site) type of fine field
   // nbasis      == number of deflation vectors
   template<class Fobj,class CComplex,int nbasis>
@@ -1098,29 +1084,7 @@ namespace Grid {
 
     std::vector<CoarseMatrix> A;
 
-    TimeProfiler timers;
-
-    double tM;
-    double tMdag;
-    double tMdir;
-    double tmDiag;
-    double tCoarsenOperator;
-
-    double fM;
-    double fMdag;
-    double fMdir;
-    double fmDiag;
-    double fCoarsenOperator;
-
-    double bM;
-    double bMdag;
-    double bMdir;
-    double bmDiag;
-    double bCoarsenOperator;
-
-    ///////////////////////
-    ///////////////////////
-    ///////////////////////
+      
     ///////////////////////
     // Interface
     ///////////////////////
@@ -1177,7 +1141,12 @@ namespace Grid {
       SimpleCompressor<siteVector> compressor;
       Stencil.HaloExchange(in,compressor);
 
-      auto point = geom.PointFromDirDisp(dir, disp);
+      auto point = [dir, disp](){
+        if(dir == 0 and disp == 0)
+          return 8;
+        else
+          return (4 * dir + 1 - disp) / 2;
+      }();
 
       parallel_for(int ss=0;ss<Grid()->oSites();ss++){
         siteVector res = zero;
@@ -1202,11 +1171,7 @@ namespace Grid {
     };
 
     void Mdiag(const CoarseVector &in, CoarseVector &out){
-      // use the self-coupling point of the stencil
-      auto p    = geom.SelfStencilPoint();
-      auto dir  = geom.directions[p];
-      auto disp = geom.displacements[p];
-      return Mdir(in, out, dir, disp);
+      Mdir(in, out, 0, 0); // use the self coupling (= last) point of the stencil
     };
 
     CoarsenedMatrix(GridCartesian &CoarseGrid) 	: 
@@ -1214,14 +1179,13 @@ namespace Grid {
       _grid(&CoarseGrid),
       geom(CoarseGrid._ndimension),
       Stencil(&CoarseGrid,geom.npoint,Even,geom.directions,geom.displacements),
-      A(geom.npoint,&CoarseGrid),
-      timers("CoarsenedMatrix.CoarsenOperator", {"Total", "Misc", "Copy", "LatticeCoordinate", "Orthogonalise", "ApplyOperator", "PickBlocks", "Restriction", "LinkConstruction"})
-    {};
+      A(geom.npoint,&CoarseGrid)
+    {
+    };
 
     void CoarsenOperator(GridBase *FineGrid,LinearOperatorBase<Lattice<Fobj> > &linop,
 			 Aggregation<Fobj,CComplex,nbasis> & Subspace){
-      timers["Total"].Start();
-      timers["Misc"].Start();
+
       FineField iblock(FineGrid); // contributions from within this block
       FineField oblock(FineGrid); // contributions from outwith this block
 
@@ -1230,90 +1194,67 @@ namespace Grid {
       FineField     zz(FineGrid); zz=zero;
       FineField    Mphi(FineGrid);
 
-      std::vector<Lattice<iScalar<vInteger> > > coor(geom.npoint, FineGrid);
-      std::vector<Integer> block(geom.npoint, 0);
+      Lattice<iScalar<vInteger> > coor(FineGrid);
 
       CoarseVector iProj(Grid()); 
       CoarseVector oProj(Grid()); 
       CoarseScalar InnerProd(Grid()); 
-      timers["Misc"].Stop();
 
-      timers["Orthogonalise"].Start();
       // Orthogonalise the subblocks over the basis
       blockOrthogonalise(InnerProd,Subspace.subspace);
-      timers["Orthogonalise"].Stop();
 
-      timers["Misc"].Start();
       // Compute the matrix elements of linop between this orthonormal
       // set of vectors.
-      int self_stencil = geom.SelfStencilPoint();
+      int self_stencil=-1;
       for(int p=0;p<geom.npoint;p++){ 
 	A[p]=zero;
-        block[p]=(FineGrid->_rdimensions[geom.directions[p]])/(Grid()->_rdimensions[geom.directions[p]]);
+	if( geom.displacements[p]==0){
+	  self_stencil=p;
+	}
       }
-      timers["Misc"].Stop();
-
-      timers["LatticeCoordinate"].Start();
-      for(int p=0;p<geom.npoint;p++){
-        LatticeCoordinate(coor[p],geom.directions[p]);
-      }
-      timers["LatticeCoordinate"].Stop();
+      assert(self_stencil!=-1);
 
       for(int i=0;i<nbasis;i++){
-        timers["Copy"].Start();
 	phi=Subspace.subspace[i];
-        timers["Copy"].Stop();
 	
 	std::cout<<GridLogMessage<<"("<<i<<").."<<std::endl;
 
 	for(int p=0;p<geom.npoint;p++){ 
 
-          timers["Misc"].Start();
 	  int dir   = geom.directions[p];
 	  int disp  = geom.displacements[p];
 
 	  Integer block=(FineGrid->_rdimensions[dir])/(Grid()->_rdimensions[dir]);
-          timers["Misc"].Stop();
 
-          timers["LatticeCoordinate"].Start();
 	  LatticeCoordinate(coor,dir);
-          timers["LatticeCoordinate"].Stop();
 
-          timers["ApplyOperator"].Start();
 	  if ( disp==0 ){
 	    linop.OpDiag(phi,Mphi);
 	  }
 	  else  {
 	    linop.OpDir(phi,Mphi,dir,disp); 
 	  }
-          timers["ApplyOperator"].Stop();
 
 	  ////////////////////////////////////////////////////////////////////////
 	  // Pick out contributions coming from this cell and neighbour cell
 	  ////////////////////////////////////////////////////////////////////////
-          timers["PickBlocks"].Start();
 	  if ( disp==0 ) {
 	    iblock = Mphi;
 	    oblock = zero;
 	  } else if ( disp==1 ) {
-	    oblock = where(mod(coor[p],block[p])==(block[p]-1),Mphi,zz);
-	    iblock = where(mod(coor[p],block[p])!=(block[p]-1),Mphi,zz);
+	    oblock = where(mod(coor,block)==(block-1),Mphi,zz);
+	    iblock = where(mod(coor,block)!=(block-1),Mphi,zz);
 	  } else if ( disp==-1 ) {
-	    oblock = where(mod(coor[p],block[p])==(Integer)0,Mphi,zz);
-	    iblock = where(mod(coor[p],block[p])!=(Integer)0,Mphi,zz);
+	    oblock = where(mod(coor,block)==(Integer)0,Mphi,zz);
+	    iblock = where(mod(coor,block)!=(Integer)0,Mphi,zz);
 	  } else {
 	    assert(0);
 	  }
-          timers["PickBlocks"].Stop();
 
-          timers["Restriction"].Start();
 	  Subspace.ProjectToSubspace(iProj,iblock);
 	  Subspace.ProjectToSubspace(oProj,oblock);
 	  //	  blockProject(iProj,iblock,Subspace.subspace);
 	  //	  blockProject(oProj,oblock,Subspace.subspace);
-          timers["Restriction"].Stop();
-
-          timers["LinkConstruction"].Start();
 	  parallel_for(int ss=0;ss<Grid()->oSites();ss++){
 	    for(int j=0;j<nbasis;j++){
 	      if( disp!= 0 ) {
@@ -1322,7 +1263,6 @@ namespace Grid {
 	      A[self_stencil]._odata[ss](j,i) =	A[self_stencil]._odata[ss](j,i) + iProj._odata[ss](j);
 	    }
 	  }
-          timers["LinkConstruction"].Stop();
 	}
       }
 
@@ -1350,7 +1290,6 @@ namespace Grid {
       //      ForceHermitian();
       // AssertHermitian();
       // ForceDiagonal();
-      timers["Total"].Stop();
     }
     void ForceDiagonal(void) {
 
@@ -1405,7 +1344,7 @@ namespace Grid {
       std::cout<<GridLogMessage<<"Norm diff local "<< norm2(Diff)<<std::endl;
       std::cout<<GridLogMessage<<"Norm local "<< norm2(A[8])<<std::endl;
     }
-
+    
   };
 
 }
