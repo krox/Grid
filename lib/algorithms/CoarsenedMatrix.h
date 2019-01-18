@@ -684,6 +684,7 @@ namespace Grid {
                                                           {"LatticeCoord", GridPerfMonitor()},
                                                           {"ApplyOp", GridPerfMonitor()},
                                                           {"PickBlocks", GridPerfMonitor()},
+                                                          {"InnerBlockSummation", GridPerfMonitor()},
                                                           {"ProjectToSubspace", GridPerfMonitor()},
                                                           {"ConstructLinks", GridPerfMonitor()},
 #if defined(SAVE_DIRECTIONS)
@@ -697,20 +698,21 @@ namespace Grid {
       auto len = 2; // TODO: This should either be Ncs or Nsb, not a hard-coded 2
 
       FineFermionField phi(FineGrid);
+      FineFermionField zeroFerm(FineGrid); zeroFerm = zero;
       std::vector<FineFermionField> phiSplit(len, FineGrid);
       std::vector<FineFermionField> MphiSplit(len, FineGrid);
+      std::vector<FineFermionField> iBlock(len, FineGrid);
 
       std::vector<FermionField> iProjSplit(len, Grid());
       std::vector<FermionField> oProjSplit(len, Grid());
 
-      FineScalarField one(FineGrid); one = 1.;
-      FineScalarField zz(FineGrid);   zz = zero;
-      FineScalarField iTmp(FineGrid);
+      FineScalarField oneScalar(FineGrid); oneScalar = 1.;
+      FineScalarField zeroScalar(FineGrid); zeroScalar = zero;
       FineScalarField oTmp(FineGrid);
+      std::vector<FineScalarField> iTmp(_geom.npoint, FineGrid);
 
       std::vector<Lattice<iScalar<vInteger> > > coor(_geom.npoint, FineGrid);
 
-      std::vector<CoarseningLookUpTable> iLut(_geom.npoint);
       std::vector<CoarseningLookUpTable> oLut(_geom.npoint);
       PerfMonitors["Misc"].Stop();
 
@@ -742,21 +744,19 @@ namespace Grid {
         int dir  = _geom.directions[p];
         int disp = _geom.displacements[p];
         Integer block = (FineGrid->_rdimensions[dir]) / (Grid()->_rdimensions[dir]);
-        iLut[p].populate(Grid(), FineGrid);
         oLut[p].populate(Grid(), FineGrid);
         if(disp == 0) {
-          iTmp = one;
-          oTmp = zz;
+          iTmp[p] = oneScalar;
+          oTmp = zeroScalar;
         } else if(disp == 1) {
-          oTmp = where(mod(coor[p], block) == (block - 1), one, zz);
-          iTmp = where(mod(coor[p], block) != (block - 1), one, zz);
+          oTmp = where(mod(coor[p], block) == (block - 1), oneScalar, zeroScalar);
+          iTmp[p] = where(mod(coor[p], block) != (block - 1), oneScalar, zeroScalar);
         } else if(disp == -1) {
-          oTmp = where(mod(coor[p], block) == (Integer)0, one, zz);
-          iTmp = where(mod(coor[p], block) != (Integer)0, one, zz);
+          oTmp = where(mod(coor[p], block) == (Integer)0, oneScalar, zeroScalar);
+          iTmp[p] = where(mod(coor[p], block) != (Integer)0, oneScalar, zeroScalar);
         } else {
           assert(0);
         }
-        iLut[p].deleteUnneededFineSites(iTmp);
         oLut[p].deleteUnneededFineSites(oTmp);
       }
       PerfMonitors["PickBlocks"].Stop(_geom.npoint);
@@ -769,7 +769,8 @@ namespace Grid {
         std::cout << GridLogMessage << "(" << i << ") .." << std::endl;
 
 #if defined(SAVE_DIRECTIONS)
-          // std::cout << "Starting coarse op construction loop for i = " << i << " p = " << p << std::endl;
+        for(int k = 0; k < len; k++) iBlock[k] = zeroFerm;
+
         for(int p = 0; p < _geom.npoint; p++) {
             PerfMonitors["Misc"].Start();
           int dir  = _geom.directions[p];
@@ -783,37 +784,42 @@ namespace Grid {
             for(int k = 0; k < len; k++) linop.OpDir(phiSplit[k], MphiSplit[k], dir, disp);
           }
           PerfMonitors["ApplyOp"].Stop(len);
-            }
+
+          PerfMonitors["InnerBlockSummation"].Start();
+          for(int k = 0; k < len; k++) iBlock[k] = iBlock[k] + where(iTmp[p] == 1, MphiSplit[k], zeroFerm);
+          PerfMonitors["InnerBlockSummation"].Stop(len);
 
           PerfMonitors["ProjectToSubspace"].Start();
-          for(int k = 0; k < len; k++) {
-            Aggregates.ProjectToSubspace(iProjSplit[k], MphiSplit[k], iLut[p]); // TODO: Think about a function to project both values of k at the same time to save running over the lattice twice
-            if(disp == +1) {
-              Aggregates.ProjectToSubspace(oProjSplit[k], MphiSplit[k], oLut[p]);
-            }
+          auto numProject = 0;
+          if(p == self_stencil) { // NOTE: Here, we rely on the self-stencil point being the last in the list. This code will break if it isn't!
+            numProject += len;
+            for(int k = 0; k < len; k++) Aggregates.ProjectToSubspace(iProjSplit[k], iBlock[k]);
+          } else if(disp == +1) {
+            numProject += len;
+            for(int k = 0; k < len; k++) Aggregates.ProjectToSubspace(oProjSplit[k], MphiSplit[k], oLut[p]);
           }
-          PerfMonitors["ProjectToSubspace"].Stop((disp == +1)?len*2:len); // TODO: This counts the number of calls, but these are no full restrictions any longer -> Think about what number to put here
+          PerfMonitors["ProjectToSubspace"].Stop(numProject); // TODO: This counts the number of calls correctly, but these are no full projections any longer -> Think about what number to put here
 
           PerfMonitors["ConstructLinks"].Start();
           parallel_for(int ss = 0; ss < Grid()->oSites(); ss++) {
             for(int j = 0; j < Nbasis; j++) {
-              if(disp == + 1) {
+              if(p == self_stencil) { // NOTE: Here, we rely on the self-stencil point being the last in the list. This code will break if it isn't!
                 for(int k = 0; k < len; k++)
                   for(int l = 0; l < len; l++)
-                    _Y[p]._odata[ss]()(l, k)(j, i) = oProjSplit[k]._odata[ss]()(l)(j);
-                // _Y._odata[ss](p)(l, k)(j, i) = oProjSplit[k]._odata[ss]()(l)(j); // NOTE This is for the new layout of Y
+                    _Y[self_stencil]._odata[ss]()(l, k)(j, i) = _Y[self_stencil]._odata[ss]()(l, k)(j, i) + iProjSplit[k]._odata[ss]()(l)(j);
               }
-              for(int k = 0; k < len; k++)
-                for(int l = 0; l < len; l++)
-                  _Y[self_stencil]._odata[ss]()(l, k)(j, i) = _Y[self_stencil]._odata[ss]()(l, k)(j, i) + iProjSplit[k]._odata[ss]()(l)(j);
-              // _Y._odata[ss](self_stencil)(l, k)(j, i) = _Y._odata[ss](self_stencil)(l, k)(j, i) + iProjSplit[k]._odata[ss]()(l)(j); // NOTE This is for the new layout of Y
+              if(disp == +1) {
+                for(int k = 0; k < len; k++)
+                  for(int l = 0; l < len; l++) _Y[p]._odata[ss]()(l, k)(j, i) = oProjSplit[k]._odata[ss]()(l)(j);
+              }
             }
           }
           PerfMonitors["ConstructLinks"].Stop();
         }
       }
       // This is the version for the old layout of Y
-      // Relation between forward and backward link matrices taken from M. Rottmann's PHD thesis
+      // Relation between forward and backward link matrices taken from M. Rottmann's PHD thesis:
+      // D_{A_{q,\kappa}, A_{p,\tau}} = - D^\dag_{A_{p,\tau}, A_{q,\kappa}}
       PerfMonitors["ShiftLinks"].Start();
       for(int p = 0; p < _geom.npoint; p++) {
         if(_geom.displacements[p] == +1) {
