@@ -768,10 +768,9 @@ namespace Grid {
 
         std::cout << GridLogMessage << "(" << i << ") .." << std::endl;
 
-        for(int p = 0; p < _geom.npoint; p++) {
-
 #if defined(SAVE_DIRECTIONS)
           // std::cout << "Starting coarse op construction loop for i = " << i << " p = " << p << std::endl;
+        for(int p = 0; p < _geom.npoint; p++) {
             PerfMonitors["Misc"].Start();
           int dir  = _geom.directions[p];
           int disp = _geom.displacements[p];
@@ -839,6 +838,7 @@ namespace Grid {
 
       std::string saveDirections = "true";
 #else
+        for(int p = 0; p < _geom.npoint; p++) {
           PerfMonitors["Misc"].Start();
           int dir  = _geom.directions[p];
           int disp = _geom.displacements[p];
