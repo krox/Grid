@@ -893,9 +893,9 @@ namespace Grid {
     void Orthogonalise(void){
       CoarseScalar InnerProd(CoarseGrid); 
       std::cout << GridLogMessage <<" Gramm-Schmidt pass 1"<<std::endl;
-      blockOrthogonalise(InnerProd,subspace);
+      OriginalImpl::blockOrthogonalise(InnerProd,subspace);
       std::cout << GridLogMessage <<" Gramm-Schmidt pass 2"<<std::endl;
-      blockOrthogonalise(InnerProd,subspace);
+      OriginalImpl::blockOrthogonalise(InnerProd,subspace);
       //      std::cout << GridLogMessage <<" Gramm-Schmidt checking orthogonality"<<std::endl;
       //      CheckOrthogonal();
     } 
@@ -903,7 +903,7 @@ namespace Grid {
       CoarseVector iProj(CoarseGrid); 
       CoarseVector eProj(CoarseGrid); 
       for(int i=0;i<nbasis;i++){
-	blockProject(iProj,subspace[i],subspace);
+	OriginalImpl::blockProject(iProj,subspace[i],subspace);
 	eProj=zero; 
 	parallel_for(int ss=0;ss<CoarseGrid->oSites();ss++){
 	  eProj._odata[ss](i)=CComplex(1.0);
@@ -914,7 +914,7 @@ namespace Grid {
       std::cout<<GridLogMessage <<"CheckOrthog done"<<std::endl;
     }
     void ProjectToSubspace(CoarseVector &CoarseVec,const FineField &FineVec){
-      blockProject(CoarseVec,FineVec,subspace);
+      OriginalImpl::blockProject(CoarseVec,FineVec,subspace);
     }
     void PromoteFromSubspace(const CoarseVector &CoarseVec,FineField &FineVec){
       FineVec.checkerboard = subspace[0].checkerboard;
@@ -1170,7 +1170,7 @@ namespace Grid {
 
       PerfMonitors["Orthogonalise"].Start();
       // Orthogonalise the subblocks over the basis
-      blockOrthogonalise(InnerProd,Subspace.subspace);
+      OriginalImpl::blockOrthogonalise(InnerProd,Subspace.subspace);
       PerfMonitors["Orthogonalise"].Stop();
 
       PerfMonitors["Misc"].Start();
@@ -1274,7 +1274,7 @@ namespace Grid {
 
       blockPick(Grid(),phi,tmp,bc);      // Pick out a block
       linop.Op(tmp,Mphi);                // Apply big dop
-      blockProject(iProj,Mphi,Subspace.subspace); // project it and print it
+      OriginalImpl::blockProject(iProj,Mphi,Subspace.subspace); // project it and print it
       std::cout<<GridLogMessage<< " Computed matrix elements from block zero only "<<std::endl;
       std::cout<<GridLogMessage<< iProj <<std::endl;
       std::cout<<GridLogMessage<<"Computed Coarse Operator"<<std::endl;
