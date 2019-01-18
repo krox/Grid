@@ -771,46 +771,46 @@ namespace Grid {
         for(int p = 0; p < _geom.npoint; p++) {
 
 #if defined(SAVE_DIRECTIONS)
-          if(_geom.displacements[p] >= 0) {
-            // std::cout << "Starting coarse op construction loop for i = " << i << " p = " << p << std::endl;
+          // std::cout << "Starting coarse op construction loop for i = " << i << " p = " << p << std::endl;
             PerfMonitors["Misc"].Start();
-            int dir  = _geom.directions[p];
-            int disp = _geom.displacements[p];
-            PerfMonitors["Misc"].Stop();
+          int dir  = _geom.directions[p];
+          int disp = _geom.displacements[p];
+          PerfMonitors["Misc"].Stop();
 
-            PerfMonitors["ApplyOp"].Start();
-            if(disp == 0) {
-              for(int k = 0; k < len; k++) linop.OpDiag(phiSplit[k], MphiSplit[k]);
-            } else {
-              for(int k = 0; k < len; k++) linop.OpDir(phiSplit[k], MphiSplit[k], dir, disp);
+          PerfMonitors["ApplyOp"].Start();
+          if(disp == 0) {
+            for(int k = 0; k < len; k++) linop.OpDiag(phiSplit[k], MphiSplit[k]);
+          } else {
+            for(int k = 0; k < len; k++) linop.OpDir(phiSplit[k], MphiSplit[k], dir, disp);
+          }
+          PerfMonitors["ApplyOp"].Stop(len);
             }
-            PerfMonitors["ApplyOp"].Stop(len);
 
-            PerfMonitors["ProjectToSubspace"].Start();
-            for(int k = 0; k < len; k++) {
-              Aggregates.ProjectToSubspace(
-                iProjSplit[k],
-                MphiSplit[k],
-                iLut[p]); // TODO: Think about a function to project both at the same time to save running over the lattice twice
+          PerfMonitors["ProjectToSubspace"].Start();
+          for(int k = 0; k < len; k++) {
+            Aggregates.ProjectToSubspace(iProjSplit[k], MphiSplit[k], iLut[p]); // TODO: Think about a function to project both values of k at the same time to save running over the lattice twice
+            if(disp == +1) {
               Aggregates.ProjectToSubspace(oProjSplit[k], MphiSplit[k], oLut[p]);
             }
-            PerfMonitors["ProjectToSubspace"].Stop(
-              len * 2); // TODO: This counts the number of calls, but these are no full restrictions any longer -> Think about what number to put here
+          }
+          PerfMonitors["ProjectToSubspace"].Stop((disp == +1)?len*2:len); // TODO: This counts the number of calls, but these are no full restrictions any longer -> Think about what number to put here
 
-            PerfMonitors["ConstructLinks"].Start();
-            parallel_for(int ss = 0; ss < Grid()->oSites(); ss++) {
-              for(int j = 0; j < Nbasis; j++) {
-                if(disp != 0) {
-                  for(int k = 0; k < len; k++)
-                    for(int l = 0; l < len; l++) _Y[p]._odata[ss]()(l, k)(j, i) = oProjSplit[k]._odata[ss]()(l)(j);
-                }
+          PerfMonitors["ConstructLinks"].Start();
+          parallel_for(int ss = 0; ss < Grid()->oSites(); ss++) {
+            for(int j = 0; j < Nbasis; j++) {
+              if(disp == + 1) {
                 for(int k = 0; k < len; k++)
                   for(int l = 0; l < len; l++)
-                    _Y[self_stencil]._odata[ss]()(l, k)(j, i) = _Y[self_stencil]._odata[ss]()(l, k)(j, i) + iProjSplit[k]._odata[ss]()(l)(j);
+                    _Y[p]._odata[ss]()(l, k)(j, i) = oProjSplit[k]._odata[ss]()(l)(j);
+                // _Y._odata[ss](p)(l, k)(j, i) = oProjSplit[k]._odata[ss]()(l)(j); // NOTE This is for the new layout of Y
               }
+              for(int k = 0; k < len; k++)
+                for(int l = 0; l < len; l++)
+                  _Y[self_stencil]._odata[ss]()(l, k)(j, i) = _Y[self_stencil]._odata[ss]()(l, k)(j, i) + iProjSplit[k]._odata[ss]()(l)(j);
+              // _Y._odata[ss](self_stencil)(l, k)(j, i) = _Y._odata[ss](self_stencil)(l, k)(j, i) + iProjSplit[k]._odata[ss]()(l)(j); // NOTE This is for the new layout of Y
             }
-            PerfMonitors["ConstructLinks"].Stop();
           }
+          PerfMonitors["ConstructLinks"].Stop();
         }
       }
       // This is the version for the old layout of Y
@@ -818,8 +818,7 @@ namespace Grid {
       PerfMonitors["ShiftLinks"].Start();
       for(int p = 0; p < _geom.npoint; p++) {
         if(_geom.displacements[p] == +1) {
-          auto tmp = _Y[p];
-          tmp      = adj(tmp);
+          auto tmp = adj(_Y[p]);
           parallel_for(auto ss = tmp.begin(); ss < tmp.end(); ss++) { // TODO: Is there fancier way to do this?
             Real factor;
             for(int k = 0; k < len; k++) {
