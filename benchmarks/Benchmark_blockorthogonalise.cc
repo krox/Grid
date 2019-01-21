@@ -74,30 +74,40 @@ int main(int argc, char **argv) {
   CPRNG.SeedFixedIntegers(seeds);
 
   std::vector<LatticeFermion> BasisOriginal(nBasis, FGrid); for (auto & elem : BasisOriginal) random(FPRNG, elem);
-  std::vector<LatticeFermion> BasisNew2Args(nBasis, FGrid); for (auto i = 0; i < BasisOriginal.size(); ++i) BasisNew2Args[i] = BasisOriginal[i];
-  std::vector<LatticeFermion> BasisNew3Args(nBasis, FGrid); for (auto i = 0; i < BasisOriginal.size(); ++i) BasisNew3Args[i] = BasisOriginal[i];
+  std::vector<LatticeFermion> BasisNewFewerArgs(nBasis, FGrid); for (auto i = 0; i < BasisOriginal.size(); ++i) BasisNewFewerArgs[i] = BasisOriginal[i];
+  std::vector<LatticeFermion> BasisNewMoreArgs(nBasis, FGrid); for (auto i = 0; i < BasisOriginal.size(); ++i) BasisNewMoreArgs[i] = BasisOriginal[i];
 
   LatticeFermion FineXOriginal(FGrid);
   LatticeFermion FineYOriginal(FGrid);
-  LatticeFermion FineXNew(FGrid);
-  LatticeFermion FineYNew(FGrid);
+  LatticeFermion FineZOriginal(FGrid);
+  LatticeFermion FineXNewFewerArgs(FGrid);
+  LatticeFermion FineYNewFewerArgs(FGrid);
+  LatticeFermion FineZNewFewerArgs(FGrid);
+  LatticeFermion FineXNewMoreArgs(FGrid);
+  LatticeFermion FineYNewMoreArgs(FGrid);
+  LatticeFermion FineZNewMoreArgs(FGrid);
 
   random(FPRNG, FineXOriginal);
   random(FPRNG, FineYOriginal);
-  FineXNew = FineXOriginal;
-  FineYNew = FineYOriginal;
+  random(FPRNG, FineZOriginal);
+  FineXNewFewerArgs = FineXOriginal;
+  FineYNewFewerArgs = FineYOriginal;
+  FineZNewFewerArgs = FineZOriginal;
+  FineXNewMoreArgs = FineXOriginal;
+  FineYNewMoreArgs = FineYOriginal;
+  FineZNewMoreArgs = FineZOriginal;
 
   typedef Lattice<vTComplex> CoarseScalar;
 
   CoarseScalar InnerProdOriginal(CGrid);
-  CoarseScalar InnerProdNew2Args(CGrid);
-  CoarseScalar InnerProdNew3Args(CGrid);
+  CoarseScalar InnerProdNewFewerArgs(CGrid);
+  CoarseScalar InnerProdNewMoreArgs(CGrid);
 
   auto FSiteVecElems = getSiteElems<LatticeFermion>();
   auto FSiteScalarElems = getSiteElems<decltype(innerProduct(FineXOriginal._odata[0], FineYOriginal._odata[0]))>();
   auto CSiteScalarElems = getSiteElems<CoarseScalar>();
 
-  std::cout << FSiteElems << " " << CSiteElems << std::endl;
+  std::cout << FSiteVecElems << " " << CSiteScalarElems << std::endl;
 
   auto FVolume = std::accumulate(FGrid->_fdimensions.begin(), FGrid->_fdimensions.end(), 1, std::multiplies<double>());
   auto CVolume = std::accumulate(CGrid->_fdimensions.begin(), CGrid->_fdimensions.end(), 1, std::multiplies<double>());
@@ -134,33 +144,49 @@ int main(int argc, char **argv) {
 
   CoarseningLookUpTable lookUpTable(CGrid, FGrid);
 
-  BenchmarkFunction(OriginalImpl::blockOrthogonalise, flopBlockOrthogonalise, byteBlockOrthogonalise, nIter, InnerProdOriginal, BasisOriginal);
-  BenchmarkFunction(blockOrthogonalise,               flopBlockOrthogonalise, byteBlockOrthogonalise, nIter, InnerProdNew2Args, BasisNew2Args);
-  BenchmarkFunction(blockOrthogonalise,               flopBlockOrthogonalise, byteBlockOrthogonalise, nIter, InnerProdNew3Args, BasisNew3Args, lookUpTable);
+  BenchmarkFunction(OriginalImpl::blockOrthogonalise, flopBlockOrthogonalise, byteBlockOrthogonalise, nIter, InnerProdOriginal,     BasisOriginal);
+  BenchmarkFunction(blockOrthogonalise,               flopBlockOrthogonalise, byteBlockOrthogonalise, nIter, InnerProdNewFewerArgs, BasisNewFewerArgs);
+  BenchmarkFunction(blockOrthogonalise,               flopBlockOrthogonalise, byteBlockOrthogonalise, nIter, InnerProdNewMoreArgs,  BasisNewMoreArgs, lookUpTable);
 
-  for (auto i = 0; i < BasisOriginal.size(); ++i) printDeviationFromReference(BasisOriginal[i], BasisNew2Args[i]);
-  for (auto i = 0; i < BasisOriginal.size(); ++i) printDeviationFromReference(BasisOriginal[i], BasisNew3Args[i]);
+  for (auto i = 0; i < BasisOriginal.size(); ++i) printDeviationFromReference(BasisOriginal[i], BasisNewFewerArgs[i]);
+  for (auto i = 0; i < BasisOriginal.size(); ++i) printDeviationFromReference(BasisOriginal[i], BasisNewMoreArgs[i]);
 
-  BenchmarkFunction(OriginalImpl::blockInnerProduct, flopBlockInnerProduct, byteBlockInnerProduct, nIter, InnerProdOriginal, FineXOriginal, FineYOriginal);
-  BenchmarkFunction(blockInnerProduct,               flopBlockInnerProduct, byteBlockInnerProduct, nIter, InnerProdNew3Args, FineXOriginal, FineYOriginal, lookUpTable);
+  BenchmarkFunction(OriginalImpl::blockInnerProduct, flopBlockInnerProduct, byteBlockInnerProduct, nIter, InnerProdOriginal,     FineXOriginal,     FineYOriginal);
+  BenchmarkFunction(blockInnerProduct,               flopBlockInnerProduct, byteBlockInnerProduct, nIter, InnerProdNewFewerArgs, FineXNewFewerArgs, FineYNewFewerArgs);
+  BenchmarkFunction(blockInnerProduct,               flopBlockInnerProduct, byteBlockInnerProduct, nIter, InnerProdNewMoreArgs,  FineXNewMoreArgs,  FineYNewMoreArgs, lookUpTable);
 
-  printDeviationFromReference(InnerProdOriginal, InnerProdNew3Args);
+  printDeviationFromReference(InnerProdOriginal, InnerProdNewFewerArgs);
+  printDeviationFromReference(InnerProdOriginal, InnerProdNewMoreArgs);
 
-  BenchmarkFunction(OriginalImpl::blockNormalise, flopBlockNormalise, byteBlockNormalise, nIter, InnerProdOriginal, FineXOriginal);
-  BenchmarkFunction(blockNormalise,               flopBlockNormalise, byteBlockNormalise, nIter, InnerProdNew3Args, FineXNew, lookUpTable);
+  BenchmarkFunction(OriginalImpl::blockNormalise, flopBlockNormalise, byteBlockNormalise, nIter, InnerProdOriginal,     FineXOriginal);
+  BenchmarkFunction(blockNormalise,               flopBlockNormalise, byteBlockNormalise, nIter, InnerProdNewFewerArgs, FineXNewFewerArgs);
+  BenchmarkFunction(blockNormalise,               flopBlockNormalise, byteBlockNormalise, nIter, InnerProdNewMoreArgs,  FineXNewMoreArgs, lookUpTable);
 
-  printDeviationFromReference(FineXOriginal, FineXNew);
+  printDeviationFromReference(FineXOriginal, FineXNewFewerArgs);
+  printDeviationFromReference(FineXOriginal, FineXNewMoreArgs);
+
+  BenchmarkFunction(OriginalImpl::blockZAXPY, flopBlockZAXPY, byteBlockZAXPY, nIter, FineZOriginal,     InnerProdOriginal,     FineXOriginal,     FineYOriginal);
+  BenchmarkFunction(blockZAXPY,               flopBlockZAXPY, byteBlockZAXPY, nIter, FineZNewFewerArgs, InnerProdNewFewerArgs, FineXNewFewerArgs, FineYNewFewerArgs);
+  BenchmarkFunction(blockZAXPY,               flopBlockZAXPY, byteBlockZAXPY, nIter, FineZNewMoreArgs,  InnerProdNewMoreArgs,  FineXNewMoreArgs,  FineYNewMoreArgs, lookUpTable);
+
+  printDeviationFromReference(FineZOriginal, FineZNewFewerArgs);
 
   if (doPerfProfiling) {
-    PerfProfileFunction(OriginalImpl::blockOrthogonalise, nIter, InnerProdOriginal, BasisOriginal);
-    PerfProfileFunction(blockOrthogonalise,               nIter, InnerProdNew2Args, BasisNew2Args);
-    PerfProfileFunction(blockOrthogonalise,               nIter, InnerProdNew3Args, BasisNew3Args, lookUpTable);
+    PerfProfileFunction(OriginalImpl::blockOrthogonalise, nIter, InnerProdOriginal,     BasisOriginal);
+    PerfProfileFunction(blockOrthogonalise,               nIter, InnerProdNewFewerArgs, BasisNewFewerArgs);
+    PerfProfileFunction(blockOrthogonalise,               nIter, InnerProdNewMoreArgs,  BasisNewMoreArgs, lookUpTable);
 
-    PerfProfileFunction(OriginalImpl::blockInnerProduct, nIter, InnerProdOriginal, FineXOriginal, FineYOriginal);
-    PerfProfileFunction(blockInnerProduct,               nIter, InnerProdNew3Args, FineXOriginal, FineYOriginal, lookUpTable);
+    PerfProfileFunction(OriginalImpl::blockInnerProduct, nIter, InnerProdOriginal,     FineXOriginal,     FineYOriginal);
+    PerfProfileFunction(blockInnerProduct,               nIter, InnerProdNewFewerArgs, FineXNewFewerArgs, FineYNewFewerArgs);
+    PerfProfileFunction(blockInnerProduct,               nIter, InnerProdNewMoreArgs,  FineXNewMoreArgs,  FineYNewMoreArgs, lookUpTable);
 
-    PerfProfileFunction(OriginalImpl::blockNormalise, nIter, InnerProdOriginal, FineXOriginal);
-    PerfProfileFunction(blockNormalise,               nIter, InnerProdNew3Args, FineXNew, lookUpTable);
+    PerfProfileFunction(OriginalImpl::blockNormalise, nIter, InnerProdOriginal,     FineXOriginal);
+    PerfProfileFunction(blockNormalise,               nIter, InnerProdNewFewerArgs, FineXNewFewerArgs);
+    PerfProfileFunction(blockNormalise,               nIter, InnerProdNewMoreArgs,  FineXNewMoreArgs, lookUpTable);
+
+    PerfProfileFunction(OriginalImpl::blockZAXPY, nIter, FineZOriginal,     InnerProdOriginal,     FineXOriginal,     FineYOriginal);
+    PerfProfileFunction(blockZAXPY,               nIter, FineZNewFewerArgs, InnerProdNewFewerArgs, FineXNewFewerArgs, FineYNewFewerArgs);
+    PerfProfileFunction(blockZAXPY,               nIter, FineZNewMoreArgs,  InnerProdNewMoreArgs,  FineXNewMoreArgs,  FineYNewMoreArgs, lookUpTable);
   }
 
   Grid_finalize();
