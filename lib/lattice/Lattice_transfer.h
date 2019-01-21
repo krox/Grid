@@ -48,7 +48,13 @@ public:
     populate(_coarse, _fine);
   }
 
-  CoarseningLookUpTable() = delete;
+  CoarseningLookUpTable()
+    : _coarse(nullptr)
+    , _fine(nullptr)
+    , _isPopulated(false)
+    , _lut() {}
+
+  ~CoarseningLookUpTable() = default;
   CoarseningLookUpTable(const CoarseningLookUpTable &) = delete;
   CoarseningLookUpTable & operator=(const CoarseningLookUpTable &) = delete;
   CoarseningLookUpTable(CoarseningLookUpTable &&) = delete;
