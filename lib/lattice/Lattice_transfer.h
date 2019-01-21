@@ -83,12 +83,12 @@ public:
 
   void populate(GridBase *coarse, GridBase *fine) {
     if(gridPointersMatch(coarse, fine) && isPopulated()) {
-      // std::cout << GridLogMessage << "No recalculation needed. Skipping" << std::endl;
+      std::cout << GridLogMessage << "No recalculation of coarsening lookup table needed. Skipping" << std::endl;
       return;
     } else {
-      // std::cout << GridLogMessage << "Recalculating Lookup table" << std::endl;
       setGridPointers(coarse, fine);
       populate();
+      std::cout << GridLogMessage << "Recalculation of coarsening lookup table finished" << std::endl;
     }
   }
 
@@ -97,6 +97,8 @@ public:
     assert(in._grid == _fine);
 
     typename ScalarField::scalar_type zz(0.);
+
+    // TODO: Is this correct if there are simd sites within different aggregates / can this situation happen at all?
     parallel_for(int sc = 0; sc < _coarse->oSites(); sc++) {
       std::vector<int> tmp;
       for(int i = 0; i < _lut[sc].size(); i++) {
@@ -190,15 +192,16 @@ inline void subdivides(GridBase *coarse,GridBase *fine)
   }
   
 
-// Function overload to be able to support existing interface
-// However the function with only 3 arguments suffers from the
-// performance penalty of calculating the lookup table. The one
-// with 4 arguments is aimed at reusing the lookup table
+// We provide function overloads for some of the upcoming functions to be able to implement new functionality while retaining support for the old interface
+// The performance of the versions with fewer function arguments suffers from the penalty of calculating the lookup table, respectively
+// The ones with more arguments circumvent this by reusing an already calculated lookup table passed by calling code
+
 template<class vobj,class CComplex,int nbasis>
 inline void blockProject(Lattice<iVector<CComplex,nbasis > > &coarseData,
 			 const             Lattice<vobj>   &fineData,
 			 const std::vector<Lattice<vobj> > &Basis)
 {
+  std::cout << GridLogDebug << "New implementation of " << __FUNCTION__ << " with 3 (= fewer) args called" << std::endl;
   CoarseningLookUpTable lookUpTable(coarseData._grid, fineData._grid);
   blockProject(coarseData, fineData, Basis, lookUpTable);
 }
@@ -208,6 +211,7 @@ inline void blockProject(Lattice<iVector<CComplex,nbasis > > &coarseData,
                          const std::vector<Lattice<vobj> >   &Basis,
                          const CoarseningLookUpTable         &lookUpTable)
 {
+  std::cout << GridLogDebug << "New implementation of " << __FUNCTION__ << " with 4 (= more) args called" << std::endl;
   GridBase *fine   = fineData._grid;
   GridBase *coarse = coarseData._grid;
 
@@ -236,6 +240,18 @@ inline void blockZAXPY(Lattice<vobj> &fineZ,
 		       const Lattice<vobj> &fineX,
 		       const Lattice<vobj> &fineY)
 {
+  std::cout << GridLogDebug << "New implementation of " << __FUNCTION__ << " with 4 (= fewer) args called" << std::endl;
+  CoarseningLookUpTable lookUpTable(coarseA._grid, fineX._grid);
+  blockZAXPY(fineZ, coarseA, fineX, fineY, lookUpTable);
+}
+template<class vobj, class CComplex>
+inline void blockZAXPY(Lattice<vobj> &              fineZ,
+                       const Lattice<CComplex> &    coarseA,
+                       const Lattice<vobj> &        fineX,
+                       const Lattice<vobj> &        fineY,
+                       const CoarseningLookUpTable &lookUpTable)
+{
+  std::cout << GridLogDebug << "New implementation of " << __FUNCTION__ << " with 5 (= more) args called" << std::endl;
   GridBase * fine  = fineZ._grid;
   GridBase * coarse= coarseA._grid;
 
@@ -244,6 +260,7 @@ inline void blockZAXPY(Lattice<vobj> &fineZ,
   subdivides(coarse,fine); // require they map
   conformable(fineX,fineY);
   conformable(fineX,fineZ);
+  assert(lookUpTable.gridPointersMatch(coarse, fine));
 
   int _ndimension = coarse->_ndimension;
   
@@ -255,31 +272,32 @@ inline void blockZAXPY(Lattice<vobj> &fineZ,
     assert(block_r[d]*coarse->_rdimensions[d]==fine->_rdimensions[d]);
   }
 
-  parallel_for(int sf=0;sf<fine->oSites();sf++){
-    
-    int sc;
-    std::vector<int> coor_c(_ndimension);
-    std::vector<int> coor_f(_ndimension);
-
-    Lexicographic::CoorFromIndex(coor_f,sf,fine->_rdimensions);
-    for(int d=0;d<_ndimension;d++) coor_c[d]=coor_f[d]/block_r[d];
-    Lexicographic::IndexFromCoor(coor_c,sc,coarse->_rdimensions);
-
-    // z = A x + y
-    fineZ._odata[sf]=coarseA._odata[sc]*fineX._odata[sf]+fineY._odata[sf];
-
+  parallel_for(int sc = 0; sc < coarse->oSites(); sc++) {
+    for(int sf : lookUpTable()[sc]) {
+      // z = A x + y
+      fineZ._odata[sf] = coarseA._odata[sc] * fineX._odata[sf] + fineY._odata[sf];
+    }
   }
 
   return;
 }
 
-// NOTE: No overload of this function, since it is not used outside this file
+template<class vobj,class CComplex>
+inline void blockInnerProduct(Lattice<CComplex> &CoarseInner,
+                              const Lattice<vobj> &fineX,
+                              const Lattice<vobj> &fineY)
+{
+  std::cout << GridLogDebug << "New implementation of " << __FUNCTION__ << " with 3 (= fewer) args called" << std::endl;
+  CoarseningLookUpTable lookUpTable(CoarseInner._grid, fineX._grid);
+  blockInnerProduct(CoarseInner, fineX, fineY, lookUpTable);
+}
 template<class vobj,class CComplex>
 inline void blockInnerProduct(Lattice<CComplex> &CoarseInner,
                               const Lattice<vobj> &fineX,
                               const Lattice<vobj> &fineY,
                               const CoarseningLookUpTable &lookUpTable)
 {
+  std::cout << GridLogDebug << "New implementation of " << __FUNCTION__ << " called" << std::endl;
   typedef decltype(innerProduct(fineX._odata[0],fineY._odata[0])) dotp;
 
   GridBase *coarse(CoarseInner._grid);
@@ -298,27 +316,32 @@ inline void blockInnerProduct(Lattice<CComplex> &CoarseInner,
   }
 }
 
-// NOTE: No overload of this function, since it is not used outside this file
+template<class vobj,class CComplex>
+inline void blockNormalise(Lattice<CComplex> &ip,
+                           Lattice<vobj> &fineX)
+{
+  std::cout << GridLogDebug << "New implementation of " << __FUNCTION__ << " with 2 (= fewer) args called" << std::endl;
+  CoarseningLookUpTable lookUpTable(ip._grid, fineX._grid);
+  blockNormalise(ip, fineX, lookUpTable);
+}
 template<class vobj,class CComplex>
 inline void blockNormalise(Lattice<CComplex> &ip,
                            Lattice<vobj> &fineX,
                            const CoarseningLookUpTable &lookUpTable)
 {
+  std::cout << GridLogDebug << "New implementation of " << __FUNCTION__ << " with 3 (= more) args called" << std::endl;
   GridBase *coarse = ip._grid;
   assert(lookUpTable.gridPointersMatch(coarse, fineX._grid));
   Lattice<vobj> zz(fineX._grid); zz=zero; zz.checkerboard=fineX.checkerboard;
   blockInnerProduct(ip,fineX,fineX,lookUpTable);
   ip = pow(ip,-0.5);
-  blockZAXPY(fineX,ip,fineX,zz);
+  blockZAXPY(fineX,ip,fineX,zz,lookUpTable);
 }
 
-// Function overload to be able to support existing interface
-// However the function with only 2 arguments suffers from the
-// performance penalty of calculating the lookup table. The one
-// with 3 arguments is aimed at reusing the lookup table
 template<class vobj>
 inline void blockSum(Lattice<vobj> &coarseData,const Lattice<vobj> &fineData)
 {
+  std::cout << GridLogDebug << "New implementation of " << __FUNCTION__ << " with 2 (= fewer) args called" << std::endl;
   CoarseningLookUpTable lookUpTable(coarseData._grid, fineData._grid);
   blockSum(coarseData, fineData, lookUpTable);
 }
@@ -327,6 +350,7 @@ inline void blockSum(Lattice<vobj> &coarseData,
                      const Lattice<vobj> &fineData,
                      const CoarseningLookUpTable &lookUpTable)
 {
+  std::cout << GridLogDebug << "New implementation of " << __FUNCTION__ << " with 3 (= more) args called" << std::endl;
   GridBase *fine   = fineData._grid;
   GridBase *coarse = coarseData._grid;
   subdivides(coarse, fine);
@@ -364,13 +388,10 @@ inline void blockPick(GridBase *coarse,const Lattice<vobj> &unpicked,Lattice<vob
   }
 }
 
-// Function overload to be able to support existing interface
-// However the function with only 2 arguments suffers from the
-// performance penalty of calculating the lookup table. The one
-// with 3 arguments is aimed at reusing the lookup table
 template<class vobj,class CComplex>
 inline void blockOrthogonalise(Lattice<CComplex> &ip,std::vector<Lattice<vobj> > &Basis)
 {
+  std::cout << GridLogDebug << "New implementation of " << __FUNCTION__ << " with 2 (= fewer) args called" << std::endl;
   CoarseningLookUpTable lookUpTable(ip._grid, Basis[0]._grid);
   blockOrthogonalise(ip, Basis, lookUpTable);
 }
@@ -379,6 +400,7 @@ inline void blockOrthogonalise(Lattice<CComplex> &ip,
                                std::vector<Lattice<vobj> > &Basis,
                                const CoarseningLookUpTable &lookUpTable)
 {
+  std::cout << GridLogDebug << "New implementation of " << __FUNCTION__ << " with 3 (= more) args called" << std::endl;
   GridBase *coarse = ip._grid;
   GridBase *fine   = Basis[0]._grid;
 
@@ -397,7 +419,7 @@ inline void blockOrthogonalise(Lattice<CComplex> &ip,
       //Inner product & remove component 
       blockInnerProduct(ip,Basis[u],Basis[v],lookUpTable);
       ip = -ip;
-      blockZAXPY<vobj,CComplex> (Basis[v],ip,Basis[u],Basis[v]);
+      blockZAXPY<vobj,CComplex> (Basis[v],ip,Basis[u],Basis[v],lookUpTable);
     }
     blockNormalise(ip,Basis[v],lookUpTable);
   }
@@ -1199,6 +1221,7 @@ void Grid_unsplit(std::vector<Lattice<Vobj> > & full,Lattice<Vobj>   & split)
   }
 }
 
+// Keep the original implementations of the functions we modified around
 namespace OriginalImpl {
 
 template<class vobj,class CComplex,int nbasis>
@@ -1206,6 +1229,7 @@ inline void blockProject(Lattice<iVector<CComplex,nbasis > > &coarseData,
                          const             Lattice<vobj>   &fineData,
                          const std::vector<Lattice<vobj> > &Basis)
 {
+  std::cout << GridLogDebug << "Original implementation of " << __FUNCTION__ << " called" << std::endl;
   GridBase * fine  = fineData._grid;
   GridBase * coarse= coarseData._grid;
   int  _ndimension = coarse->_ndimension;
@@ -1250,6 +1274,7 @@ PARALLEL_CRITICAL
 template<class vobj>
 inline void blockSum(Lattice<vobj> &coarseData,const Lattice<vobj> &fineData)
 {
+  std::cout << GridLogDebug << "Original implementation of " << __FUNCTION__ << " called" << std::endl;
   GridBase * fine  = fineData._grid;
   GridBase * coarse= coarseData._grid;
 
@@ -1287,10 +1312,63 @@ PARALLEL_CRITICAL
 }
 
 template<class vobj,class CComplex>
+inline void blockZAXPY(Lattice<vobj> &fineZ,
+		       const Lattice<CComplex> &coarseA,
+		       const Lattice<vobj> &fineX,
+		       const Lattice<vobj> &fineY)
+{
+  std::cout << GridLogDebug << "Original implementation of " << __FUNCTION__ << " called" << std::endl;
+  GridBase * fine  = fineZ._grid;
+  GridBase * coarse= coarseA._grid;
+
+  fineZ.checkerboard=fineX.checkerboard;
+  assert(fineX.checkerboard==fineY.checkerboard);
+  subdivides(coarse,fine); // require they map
+  conformable(fineX,fineY);
+  conformable(fineX,fineZ);
+
+  int _ndimension = coarse->_ndimension;
+
+  std::vector<int>  block_r      (_ndimension);
+
+  // FIXME merge with subdivide checking routine as this is redundant
+  for(int d=0 ; d<_ndimension;d++){
+    block_r[d] = fine->_rdimensions[d] / coarse->_rdimensions[d];
+    assert(block_r[d]*coarse->_rdimensions[d]==fine->_rdimensions[d]);
+  }
+
+  parallel_for(int sf=0;sf<fine->oSites();sf++){
+
+    int sc;
+    std::vector<int> coor_c(_ndimension);
+    std::vector<int> coor_f(_ndimension);
+
+    Lexicographic::CoorFromIndex(coor_f,sf,fine->_rdimensions);
+    for(int d=0;d<_ndimension;d++) coor_c[d]=coor_f[d]/block_r[d];
+    Lexicographic::IndexFromCoor(coor_c,sc,coarse->_rdimensions);
+
+    // z = A x + y
+    fineZ._odata[sf]=coarseA._odata[sc]*fineX._odata[sf]+fineY._odata[sf];
+
+  }
+
+  return;
+}
+
+template<class vobj,class CComplex>
 inline void blockInnerProduct(Lattice<CComplex> &CoarseInner,
                               const Lattice<vobj> &fineX,
                               const Lattice<vobj> &fineY)
 {
+  std::cout << GridLogDebug << "Original implementation of " << __FUNCTION__ << " called" << std::endl;
+  GridStopWatch totalTimer;
+  GridStopWatch preambleTimer;
+  GridStopWatch localInnerProductTimer;
+  GridStopWatch blockSumTimer;
+  GridStopWatch copyTimer;
+
+  totalTimer.Start();
+  preambleTimer.Start();
   typedef decltype(innerProduct(fineX._odata[0],fineY._odata[0])) dotp;
 
   GridBase *coarse(CoarseInner._grid);
@@ -1312,9 +1390,9 @@ inline void blockNormalise(Lattice<CComplex> &ip,Lattice<vobj> &fineX)
 {
   GridBase *coarse = ip._grid;
   Lattice<vobj> zz(fineX._grid); zz=zero; zz.checkerboard=fineX.checkerboard;
-  blockInnerProduct(ip,fineX,fineX);
+  Grid::OriginalImpl::blockInnerProduct(ip,fineX,fineX);
   ip = pow(ip,-0.5);
-  blockZAXPY(fineX,ip,fineX,zz);
+  Grid::OriginalImpl::blockZAXPY(fineX,ip,fineX,zz);
 }
 
 template<class vobj,class CComplex>
@@ -1334,9 +1412,9 @@ inline void blockOrthogonalise(Lattice<CComplex> &ip,std::vector<Lattice<vobj> >
   for(int v=0;v<nbasis;v++) {
     for(int u=0;u<v;u++) {
       //Inner product & remove component
-      blockInnerProduct(ip,Basis[u],Basis[v]);
+      Grid::OriginalImpl::blockInnerProduct(ip, Basis[u], Basis[v]);
       ip = -ip;
-      blockZAXPY<vobj,CComplex> (Basis[v],ip,Basis[u],Basis[v]);
+      Grid::OriginalImpl::blockZAXPY<vobj,CComplex> (Basis[v],ip,Basis[u],Basis[v]);
     }
   }
 }
