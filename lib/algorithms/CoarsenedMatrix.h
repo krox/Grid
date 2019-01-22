@@ -673,7 +673,7 @@ namespace Grid {
       FineScalarField oTmp(FineGrid);
       std::vector<FineScalarField> iTmp(_geom.npoint, FineGrid);
 
-      std::vector<Lattice<iScalar<vInteger> > > coor(_geom.npoint, FineGrid);
+      Lattice<iScalar<vInteger> > coor(FineGrid);
 
       std::vector<CoarseningLookUpTable> oLut(_geom.npoint);
       PerfMonitors["Misc"].Stop();
@@ -692,36 +692,34 @@ namespace Grid {
       }
       PerfMonitors["Misc"].Stop();
 
-      PerfMonitors["LatticeCoord"].Start();
-      for(int p=0;p<_geom.npoint;p++) {
-        LatticeCoordinate(coor[p],_geom.directions[p]);
-      }
-      PerfMonitors["LatticeCoord"].Stop(_geom.npoint);
-
-      PerfMonitors["PickBlocks"].Start();
       ////////////////////////////////////////////////////////////////////////
       // Pick out contributions coming from this cell and neighbour cell and put them in the lookup table
       ////////////////////////////////////////////////////////////////////////
       for(int p=0;p<_geom.npoint;p++) {
         int dir  = _geom.directions[p];
         int disp = _geom.displacements[p];
+        PerfMonitors["LatticeCoord"].Start();
+        LatticeCoordinate(coor, dir);
+        PerfMonitors["LatticeCoord"].Stop();
+
+        PerfMonitors["PickBlocks"].Start();
         Integer block = (FineGrid->_rdimensions[dir]) / (Grid()->_rdimensions[dir]);
         oLut[p].populate(Grid(), FineGrid);
         if(disp == 0) {
           iTmp[p] = oneScalar;
           oTmp = zeroScalar;
         } else if(disp == 1) {
-          oTmp = where(mod(coor[p], block) == (block - 1), oneScalar, zeroScalar);
-          iTmp[p] = where(mod(coor[p], block) != (block - 1), oneScalar, zeroScalar);
+          oTmp = where(mod(coor, block) == (block - 1), oneScalar, zeroScalar);
+          iTmp[p] = where(mod(coor, block) != (block - 1), oneScalar, zeroScalar);
         } else if(disp == -1) {
-          oTmp = where(mod(coor[p], block) == (Integer)0, oneScalar, zeroScalar);
-          iTmp[p] = where(mod(coor[p], block) != (Integer)0, oneScalar, zeroScalar);
+          oTmp = where(mod(coor, block) == (Integer)0, oneScalar, zeroScalar);
+          iTmp[p] = where(mod(coor, block) != (Integer)0, oneScalar, zeroScalar);
         } else {
           assert(0);
         }
         oLut[p].deleteUnneededFineSites(oTmp);
+        PerfMonitors["PickBlocks"].Stop();
       }
-      PerfMonitors["PickBlocks"].Stop(_geom.npoint);
 
       for(int i = 0; i < Nbasis; i++) {
         PerfMonitors["Copy"].Start();
