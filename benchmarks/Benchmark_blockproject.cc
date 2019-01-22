@@ -97,11 +97,11 @@ int main(int argc, char **argv) {
   auto FSiteElems = getSiteElems<decltype(FineVec)>();
   auto CSiteElems = getSiteElems<decltype(CoarseVec)>();
 
-  auto FVolume = std::accumulate(FGrid->_fdimensions.begin(), FGrid->_fdimensions.end(), 1, std::multiplies<double>());
-  auto CVolume = std::accumulate(CGrid->_fdimensions.begin(), CGrid->_fdimensions.end(), 1, std::multiplies<double>());
+  double FVolume = std::accumulate(FGrid->_fdimensions.begin(), FGrid->_fdimensions.end(), 1, std::multiplies<double>());
+  double CVolume = std::accumulate(CGrid->_fdimensions.begin(), CGrid->_fdimensions.end(), 1, std::multiplies<double>());
 
-  double flop = 1. * (8 * FSiteElems) * nBasis * FVolume;
-  double byte = 1. * (2 * 1 + 2 * FSiteElems) * nBasis * FVolume * sizeof(Complex);
+  double flop = FVolume * (8 * FSiteElems) * nBasis;
+  double byte = FVolume * (2 * 1 + 2 * FSiteElems) * nBasis * sizeof(Complex);
 
   CoarseningLookUpTable lookUpTable(CGrid, FGrid);
 

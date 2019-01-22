@@ -92,11 +92,11 @@ int main(int argc, char **argv) {
   auto FSiteElems = getSiteElems<decltype(FineVec)>();
   auto CSiteElems = getSiteElems<decltype(CoarseVec)>();
 
-  auto FVolume = std::accumulate(FGrid->_fdimensions.begin(), FGrid->_fdimensions.end(), 1, std::multiplies<double>());
-  auto CVolume = std::accumulate(CGrid->_fdimensions.begin(), CGrid->_fdimensions.end(), 1, std::multiplies<double>());
+  double FVolume = std::accumulate(FGrid->_fdimensions.begin(), FGrid->_fdimensions.end(), 1, std::multiplies<double>());
+  double CVolume = std::accumulate(CGrid->_fdimensions.begin(), CGrid->_fdimensions.end(), 1, std::multiplies<double>());
 
-  double flop = 1. * (8 * (nBasis - 1) + 6) * FSiteElems * FVolume;
-  double byte = 1. * ((1 * 1 + 3 * FSiteElems) * (nBasis - 1) + (1 * 1 + 2 * FSiteElems) * 1) * FVolume * sizeof(Complex);
+  double flop = FVolume * (8 * (nBasis - 1) + 6) * FSiteElems;
+  double byte = FVolume * ((1 * 1 + 3 * FSiteElems) * (nBasis - 1) + (1 * 1 + 2 * FSiteElems) * 1) * sizeof(Complex);
 
   BenchmarkFunction(blockPromote, flop, byte, nIter, CoarseVec, FineVec, Aggs.subspace);
 

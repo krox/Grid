@@ -109,35 +109,35 @@ int main(int argc, char **argv) {
 
   std::cout << FSiteVecElems << " " << CSiteScalarElems << std::endl;
 
-  auto FVolume = std::accumulate(FGrid->_fdimensions.begin(), FGrid->_fdimensions.end(), 1, std::multiplies<double>());
-  auto CVolume = std::accumulate(CGrid->_fdimensions.begin(), CGrid->_fdimensions.end(), 1, std::multiplies<double>());
+  double FVolume = std::accumulate(FGrid->_fdimensions.begin(), FGrid->_fdimensions.end(), 1, std::multiplies<double>());
+  double CVolume = std::accumulate(CGrid->_fdimensions.begin(), CGrid->_fdimensions.end(), 1, std::multiplies<double>());
 
   // These belong to blockInnerProduct
-  double flopLocalInnerProduct = 1. * (8 * FSiteVecElems - 2) * FVolume;
-  double byteLocalInnerProduct = 1. * (2 * FSiteVecElems + 1 * FSiteScalarElems) * FVolume * sizeof(Complex);
+  double flopLocalInnerProduct = FVolume * (8 * FSiteVecElems - 2);
+  double byteLocalInnerProduct = FVolume * (2 * FSiteVecElems + 1 * FSiteScalarElems) * sizeof(Complex);
 
-  double flopBlockSum = 1. * (2 * FSiteScalarElems) * FVolume;
-  double byteBlockSum = 1. * (2 * CSiteScalarElems + 1 * FSiteScalarElems) * FVolume * sizeof(Complex); // TODO: Correct this number in the blockSum benchmark file
+  double flopBlockSum = FVolume * (2 * FSiteScalarElems);
+  double byteBlockSum = FVolume * (2 * CSiteScalarElems + 1 * FSiteScalarElems) * sizeof(Complex);
 
-  double flopCopy = 1. * 0;
-  double byteCopy = 1. * (2 * CSiteScalarElems) * CVolume * sizeof(Complex); // TODO: In terms of user intended byte, this should be zero
+  double flopCopy = CVolume * 0;
+  double byteCopy = CVolume * (2 * CSiteScalarElems) * sizeof(Complex); // TODO: In terms of user intended byte, this should be zero
 
   double flopBlockInnerProduct = flopLocalInnerProduct + flopBlockSum + flopCopy;
   double byteBlockInnerProduct = byteLocalInnerProduct + byteBlockSum + byteCopy;
 
   // These belong to blockNormalise
-  double flopPow = 1. * (1) * CVolume; // TODO: I didn't know what to put for the 1
-  double bytePow = 1. * (2 * CSiteScalarElems) * CVolume * sizeof(Complex);
+  double flopPow = CVolume * (1); // TODO: I didn't know what to put for the 1
+  double bytePow = CVolume * (2 * CSiteScalarElems) * sizeof(Complex);
 
-  double flopBlockZAXPY = 1. * (8 * FSiteVecElems) * FVolume;
-  double byteBlockZAXPY = 1. * (3 * FSiteVecElems + 1 * CSiteScalarElems) * FVolume * sizeof(Complex); // TODO: Correct this number in the zaxpy benchmark file
+  double flopBlockZAXPY = FVolume * (8 * FSiteVecElems);
+  double byteBlockZAXPY = FVolume * (3 * FSiteVecElems + 1 * CSiteScalarElems) * sizeof(Complex); // TODO: Correct this number in the zaxpy benchmark file
 
   double flopBlockNormalise = flopBlockInnerProduct + flopPow + flopBlockZAXPY;
   double byteBlockNormalise = byteBlockInnerProduct + bytePow + byteBlockZAXPY;
 
   // These belong to blockOrthogonalise
-  double flopMinus = 1. * (6 * CSiteScalarElems) * CVolume * sizeof(Complex); // TODO: This is actually a real multiplication
-  double byteMinus = 1. * (2 * CSiteScalarElems) * CVolume * sizeof(Complex);
+  double flopMinus = CVolume * (6 * CSiteScalarElems) * sizeof(Complex); // TODO: This is actually a real multiplication
+  double byteMinus = CVolume * (2 * CSiteScalarElems) * sizeof(Complex);
 
   double flopBlockOrthogonalise = flopBlockNormalise * nBasis + (flopBlockInnerProduct + flopMinus + flopBlockZAXPY) * nBasis * (nBasis - 1) / 2.;
   double byteBlockOrthogonalise = byteBlockNormalise * nBasis + (byteBlockInnerProduct + byteMinus + byteBlockZAXPY) * nBasis * (nBasis - 1) / 2.;
