@@ -329,11 +329,11 @@ int main(int argc, char **argv) {
   BenchmarkFunction(twoSpinCoarsenedMatrix.CoarsenOperator, 0, 0, nIter, FGrid, LinOp, twoSpinAggregates);
 
   // NOTE: For these comparisons to work at the current state of development, the call to blockOrthogonalise in OriginalCoarsenedMatrix::CoarsenOperator must be commented!
-  std::cout << GridLogMessage << "Calculation deviations from original layout for one-spin layout" << std::endl;
+  std::cout << GridLogMessage << "Deviations of one-spin layout from original layout" << std::endl;
   for (int p = 0; p < originalCoarsenedMatrix.geom.npoint; ++p) {
     compareToResultInOriginalLayout<OneSpinCoarsenedMatrix>(originalCoarsenedMatrix.A[p], oneSpinCoarsenedMatrix._Y[p]);
   }
-  std::cout << GridLogMessage << "Calculation deviations from original layout for two-spin layout" << std::endl;
+  std::cout << GridLogMessage << "Deviations of two-spin layout from original layout" << std::endl;
   for(int p = 0; p < originalCoarsenedMatrix.geom.npoint; ++p) {
     compareToResultInOriginalLayout<TwoSpinCoarsenedMatrix>(originalCoarsenedMatrix.A[p], twoSpinCoarsenedMatrix._Y[p]);
   }
