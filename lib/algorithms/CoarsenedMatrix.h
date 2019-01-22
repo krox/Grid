@@ -675,6 +675,7 @@ namespace Grid {
 
       Lattice<iScalar<vInteger> > coor(FineGrid);
 
+      std::vector<CoarseningLookUpTable> iLut(_geom.npoint);
       std::vector<CoarseningLookUpTable> oLut(_geom.npoint);
       PerfMonitors["Misc"].Stop();
 
@@ -704,6 +705,7 @@ namespace Grid {
 
         PerfMonitors["PickBlocks"].Start();
         Integer block = (FineGrid->_rdimensions[dir]) / (Grid()->_rdimensions[dir]);
+        iLut[p].populate(Grid(), FineGrid);
         oLut[p].populate(Grid(), FineGrid);
         if(disp == 0) {
           iTmp[p] = oneScalar;
@@ -717,6 +719,7 @@ namespace Grid {
         } else {
           assert(0);
         }
+        iLut[p].deleteUnneededFineSites(iTmp[p]);
         oLut[p].deleteUnneededFineSites(oTmp);
         PerfMonitors["PickBlocks"].Stop();
       }
@@ -753,7 +756,7 @@ namespace Grid {
           auto numProject = 0;
           if(p == self_stencil) { // NOTE: Here, we rely on the self-stencil point being the last in the list. This code will break if it isn't!
             numProject += len;
-            for(int k = 0; k < len; k++) Aggregates.ProjectToSubspace(iProjSplit[k], iBlock[k]);
+            for(int k = 0; k < len; k++) Aggregates.ProjectToSubspace(iProjSplit[k], iBlock[k], iLut[p]);
           } else if(disp == +1) {
             numProject += len;
             for(int k = 0; k < len; k++) Aggregates.ProjectToSubspace(oProjSplit[k], MphiSplit[k], oLut[p]);
