@@ -515,19 +515,23 @@ namespace Grid {
       PerfMonitors["Total"].Start();
       PerfMonitors["Misc"].Start();
 
-      FineFermionField iblock(FineGrid); // contributions from within this block
-      FineFermionField oblock(FineGrid); // contributions from outwith this block
-
       FineFermionField phi(FineGrid);
-      FineFermionField tmp(FineGrid);
-      FineFermionField zz(FineGrid); zz = zero;
+      FineFermionField zeroFerm(FineGrid); zeroFerm = zero;
       FineFermionField Mphi(FineGrid);
-
-      Lattice<iScalar<vInteger>> coor(FineGrid);
+      FineFermionField iblock(FineGrid);
 
       FermionField iProj(Grid());
       FermionField oProj(Grid());
-      ScalarField InnerProd(Grid());
+
+      FineScalarField oneScalar(FineGrid); oneScalar   = 1.;
+      FineScalarField zeroScalar(FineGrid); zeroScalar = zero;
+      FineScalarField oTmp(FineGrid);
+      std::vector<FineScalarField> iTmp(_geom.npoint, FineGrid);
+
+      Lattice<iScalar<vInteger>> coor(FineGrid);
+
+      std::vector<CoarseningLookUpTable> iLut(_geom.npoint);
+      std::vector<CoarseningLookUpTable> oLut(_geom.npoint);
       PerfMonitors["Misc"].Stop();
 
       PerfMonitors["Orthogonalise"].Start();
@@ -544,6 +548,38 @@ namespace Grid {
       }
       PerfMonitors["Misc"].Stop();
 
+      ////////////////////////////////////////////////////////////////////////
+      // Pick out contributions coming from this cell and neighbour cell and put them in the lookup table
+      ////////////////////////////////////////////////////////////////////////
+      for(int p=0;p<_geom.npoint;p++) {
+        int dir  = _geom.directions[p];
+        int disp = _geom.displacements[p];
+        PerfMonitors["LatticeCoord"].Start();
+        LatticeCoordinate(coor, dir);
+        PerfMonitors["LatticeCoord"].Stop();
+
+        PerfMonitors["PickBlocks"].Start();
+        Integer block = (FineGrid->_rdimensions[dir]) / (Grid()->_rdimensions[dir]);
+        iLut[p].populate(Grid(), FineGrid);
+        oLut[p].populate(Grid(), FineGrid);
+        if(disp == 0) {
+          iTmp[p] = oneScalar;
+          oTmp = zeroScalar;
+        } else if(disp == 1) {
+          oTmp = where(mod(coor, block) == (block - 1), oneScalar, zeroScalar);
+          iTmp[p] = where(mod(coor, block) != (block - 1), oneScalar, zeroScalar);
+        } else if(disp == -1) {
+          oTmp = where(mod(coor, block) == (Integer)0, oneScalar, zeroScalar);
+          iTmp[p] = where(mod(coor, block) != (Integer)0, oneScalar, zeroScalar);
+        } else {
+          assert(0);
+        }
+
+        iLut[p].deleteUnneededFineSites(iTmp[p]);
+        oLut[p].deleteUnneededFineSites(oTmp);
+        PerfMonitors["PickBlocks"].Stop();
+      }
+
       for(int i = 0; i < Nbasis; i++) {
         PerfMonitors["Copy"].Start();
         phi = Aggregates._subspace[i];
@@ -551,21 +587,17 @@ namespace Grid {
 
         std::cout << GridLogMessage << "(" << i << ") .." << std::endl;
 
+#if defined(SAVE_DIRECTIONS)
+        iblock = zeroFerm;
+
         for(int p = 0; p < _geom.npoint; p++) {
 
           PerfMonitors["Misc"].Start();
           int dir  = _geom.directions[p];
           int disp = _geom.displacements[p];
-
-          Integer block = (FineGrid->_rdimensions[dir]) / (Grid()->_rdimensions[dir]);
           PerfMonitors["Misc"].Stop();
 
-          PerfMonitors["LatticeCoord"].Start();
-          LatticeCoordinate(coor, dir);
-          PerfMonitors["LatticeCoord"].Stop();
-
           PerfMonitors["ApplyOp"].Start();
-          // This paragraph is specific to the two spin version
           if(disp == 0) {
             linop.OpDiag(phi, Mphi);
           } else {
@@ -573,31 +605,57 @@ namespace Grid {
           }
           PerfMonitors["ApplyOp"].Stop();
 
-          ////////////////////////////////////////////////////////////////////////
-          // Pick out contributions coming from this cell and neighbour cell
-          ////////////////////////////////////////////////////////////////////////
-          PerfMonitors["PickBlocks"].Start();
-          if(disp == 0) {
-            iblock = Mphi;
-            oblock = zero;
-          } else if(disp == 1) {
-            oblock = where(mod(coor, block) == (block - 1), Mphi, zz);
-            iblock = where(mod(coor, block) != (block - 1), Mphi, zz);
-          } else if(disp == -1) {
-            oblock = where(mod(coor, block) == (Integer)0, Mphi, zz);
-            iblock = where(mod(coor, block) != (Integer)0, Mphi, zz);
-          } else {
-            assert(0);
-          }
-          PerfMonitors["PickBlocks"].Stop();
+          PerfMonitors["InnerBlockSummation"].Start();
+          iblock = iblock + where(iTmp[p] == 1, Mphi, zeroFerm);
+          PerfMonitors["InnerBlockSummation"].Stop();
 
           PerfMonitors["ProjectToSubspace"].Start();
-          Aggregates.ProjectToSubspace(iProj, iblock);
-          Aggregates.ProjectToSubspace(oProj, oblock);
+          auto numProject = 0;
+          if(p == self_stencil) { // NOTE: Here, we rely on the self-stencil point being the last in the list. This code will break if it isn't!
+            numProject++;
+            Aggregates.ProjectToSubspace(iProj, iblock, iLut[p]);
+          } else {
+            numProject++;
+            Aggregates.ProjectToSubspace(oProj, Mphi, oLut[p]);
+          }
+          PerfMonitors["ProjectToSubspace"].Stop(numProject); // TODO: This counts the number of calls correctly, but these are no full projections any longer -> Think about what number to put here
+
+          PerfMonitors["ConstructLinks"].Start();
+          parallel_for(int ss = 0; ss < Grid()->oSites(); ss++) {
+            for(int j = 0; j < Nbasis; j++) {
+              if(p == self_stencil) { // NOTE: Here, we rely on the self-stencil point being the last in the list. This code will break if it isn't!
+                _Y[self_stencil]._odata[ss](j, i) = _Y[self_stencil]._odata[ss](j, i) + iProj._odata[ss](j);
+              }
+              if(disp != 0) {
+                _Y[p]._odata[ss](j, i) = oProj._odata[ss](j);
+              }
+            }
+          }
+          PerfMonitors["ConstructLinks"].Stop();
+        }
+      }
+      std::string saveDirections = "true";
+#else
+        for(int p = 0; p < _geom.npoint; p++) {
+          PerfMonitors["Misc"].Start();
+          int dir  = _geom.directions[p];
+          int disp = _geom.displacements[p];
+          PerfMonitors["Misc"].Stop();
+
+          PerfMonitors["ApplyOp"].Start();
+          if(disp == 0) {
+            linop.OpDiag(phi, Mphi);
+          } else {
+            linop.OpDir(phi, Mphi, dir, disp);
+          }
+          PerfMonitors["ApplyOp"].Stop();
+
+          PerfMonitors["ProjectToSubspace"].Start();
+          Aggregates.ProjectToSubspace(iProj, Mphi, iLut[p]);
+          Aggregates.ProjectToSubspace(oProj, Mphi, oLut[p]);
           PerfMonitors["ProjectToSubspace"].Stop(2);
 
           PerfMonitors["ConstructLinks"].Start();
-          // This paragraph is specific to the two spin version
           parallel_for(int ss = 0; ss < Grid()->oSites(); ss++) {
             for(int j = 0; j < Nbasis; j++) {
               if(disp != 0) {
@@ -609,9 +667,11 @@ namespace Grid {
           PerfMonitors["ConstructLinks"].Stop();
         }
       }
+      std::string saveDirections = "false";
+#endif
       PerfMonitors["Total"].Stop();
       std::cout << GridLogMessage << "***************************************************************************" << std::endl;
-      std::cout << GridLogMessage << "Time breakdown for CoarsenOperator with isTwoSpinVersion == false" << std::endl;
+      std::cout << GridLogMessage << "Time breakdown for CoarsenOperator with isTwoSpinVersion == false and saveDirections = " << saveDirections << std::endl;
       std::cout << GridLogMessage << "***************************************************************************" << std::endl;
       printPerformanceMonitors(PerfMonitors);
     }
