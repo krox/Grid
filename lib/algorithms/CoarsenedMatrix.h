@@ -32,7 +32,6 @@ Author: paboyle <paboyle@ph.ed.ac.uk>
 #define  GRID_ALGORITHM_COARSENED_MATRIX_H
 
 
-#define SAVE_BLOCKPROJECTS
 
 namespace Grid {
 
