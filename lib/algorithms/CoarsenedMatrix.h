@@ -536,7 +536,7 @@ namespace Grid {
 
       PerfMonitors["Orthogonalise"].Start();
       // Orthogonalise the subblocks over the basis
-      // Aggregates.Orthogonalise();
+      Aggregates.Orthogonalise();
       PerfMonitors["Orthogonalise"].Stop();
 
       PerfMonitors["Misc"].Start();
@@ -750,7 +750,7 @@ namespace Grid {
 
       PerfMonitors["Orthogonalise"].Start();
       // // Orthogonalise the subblocks over the basis
-      // Aggregates.Orthogonalise();
+      Aggregates.Orthogonalise();
       PerfMonitors["Orthogonalise"].Stop();
 
       PerfMonitors["Misc"].Start();
@@ -1224,7 +1224,7 @@ namespace Grid {
 
       PerfMonitors["Orthogonalise"].Start();
       // Orthogonalise the subblocks over the basis
-      OriginalImpl::blockOrthogonalise(InnerProd,Subspace.subspace);
+      Subspace.Orthogonalise();
       PerfMonitors["Orthogonalise"].Stop();
 
       PerfMonitors["Misc"].Start();
