@@ -659,7 +659,6 @@ namespace Grid {
 
       auto len = 2; // TODO: This should either be Ncs or Nsb, not a hard-coded 2
 
-      FineFermionField phi(FineGrid);
       FineFermionField zeroFerm(FineGrid); zeroFerm = zero;
       std::vector<FineFermionField> phiSplit(len, FineGrid);
       std::vector<FineFermionField> MphiSplit(len, FineGrid);
