@@ -159,7 +159,7 @@ namespace Grid {
 
     typedef iImplSpinor<Simd>    SiteSpinor;
     typedef iImplLinkField<Simd> SiteLinkField;
-    typedef iImplLinkField<Simd> SiteScalar;
+    typedef iImplScalar<Simd>    SiteScalar;
 
     // Needs to be called FermionField, too as in the Dirac operators, so that we can use it for coarsening just like the Dirac operators
     typedef Lattice<SiteSpinor>    FermionField;
@@ -223,7 +223,7 @@ namespace Grid {
 
     typedef iImplSpinor<Simd>    SiteSpinor;
     typedef iImplLinkField<Simd> SiteLinkField;
-    typedef iImplLinkField<Simd> SiteScalar;
+    typedef iImplScalar<Simd>    SiteScalar;
 
     // Needs to be called FermionField, too as in the Dirac operators, so that we can use it for coarsening just like the Dirac operators
     typedef Lattice<SiteSpinor>    FermionField;
