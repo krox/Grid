@@ -633,6 +633,9 @@ namespace Grid {
           PerfMonitors["ConstructLinks"].Stop();
         }
       }
+      // NOTE: The stuff with calculating only the forward links for each coarse site and obtaining the backword ones
+      // from the neighbour site that I do for the two-spin version may be possible to implement here aswell but it
+      // would be ugly -> Not done at the moment
       std::string saveBlockProjects = "true";
 #else
           PerfMonitors["ProjectToSubspace"].Start();
