@@ -613,7 +613,7 @@ namespace Grid {
           if(p == self_stencil) { // NOTE: Here, we rely on the self-stencil point being the last in the list. This code will break if it isn't!
             numProject++;
             Aggregates.ProjectToSubspace(iProj, iblock, iLut[p]);
-          } else {
+          } else if(disp == +1) {
             numProject++;
             Aggregates.ProjectToSubspace(oProj, Mphi, oLut[p]);
           }
@@ -625,7 +625,7 @@ namespace Grid {
               if(p == self_stencil) { // NOTE: Here, we rely on the self-stencil point being the last in the list. This code will break if it isn't!
                 _Y[self_stencil]._odata[ss](j, i) = _Y[self_stencil]._odata[ss](j, i) + iProj._odata[ss](j);
               }
-              if(disp != 0) {
+              if(disp == +1) {
                 _Y[p]._odata[ss](j, i) = oProj._odata[ss](j);
               }
             }
@@ -633,9 +633,30 @@ namespace Grid {
           PerfMonitors["ConstructLinks"].Stop();
         }
       }
-      // NOTE: The stuff with calculating only the forward links for each coarse site and obtaining the backword ones
-      // from the neighbour site that I do for the two-spin version may be possible to implement here aswell but it
-      // would be ugly -> Not done at the moment
+      PerfMonitors["ShiftLinks"].Start();
+      for(int p = 0; p < _geom.npoint; p++) {
+        if(_geom.displacements[p] == +1) {
+          auto tmp = adj(_Y[p]);
+          parallel_for(auto ss = tmp.begin(); ss < tmp.end(); ss++) { // TODO: Is there a fancier way to do this?
+            Real factor;
+            for(int n1 = 0; n1 < Nbasis; n1++) {
+              int k = n1/(Nbasis/2);
+              for(int n2 = 0; n2 < Nbasis; n2++) {
+                int l = n2 / (Nbasis / 2);
+                if((k + l) % 2 == 1) {
+                  factor = -1.;
+                } else {
+                  factor = 1.;
+                }
+                tmp._odata[ss](n1, n2) = factor * tmp._odata[ss](n1, n2);
+              }
+            }
+          }
+          _Y[p + 1] = Cshift(tmp, _geom.directions[p], -1);
+        }
+      }
+      PerfMonitors["ShiftLinks"].Stop();
+
       std::string saveBlockProjects = "true";
 #else
           PerfMonitors["ProjectToSubspace"].Start();
@@ -834,7 +855,7 @@ namespace Grid {
       for(int p = 0; p < _geom.npoint; p++) {
         if(_geom.displacements[p] == +1) {
           auto tmp = adj(_Y[p]);
-          parallel_for(auto ss = tmp.begin(); ss < tmp.end(); ss++) { // TODO: Is there fancier way to do this?
+          parallel_for(auto ss = tmp.begin(); ss < tmp.end(); ss++) { // TODO: Is there a fancier way to do this?
             Real factor;
             for(int k = 0; k < len; k++) {
               for(int l = 0; l < len; l++) {
