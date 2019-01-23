@@ -507,6 +507,7 @@ namespace Grid {
                                                           {"ProjectToSubspace" , GridPerfMonitor()},
                                                           {"ConstructLinks" , GridPerfMonitor()},
 #if defined(SAVE_BLOCKPROJECTS)
+                                                          {"InnerBlockSummation" , GridPerfMonitor()},
                                                           {"ShiftLinks" , GridPerfMonitor()}
 #endif
                                                           };
@@ -715,10 +716,10 @@ namespace Grid {
                                                           {"LatticeCoord", GridPerfMonitor()},
                                                           {"ApplyOp", GridPerfMonitor()},
                                                           {"PickBlocks", GridPerfMonitor()},
-                                                          {"InnerBlockSummation", GridPerfMonitor()},
                                                           {"ProjectToSubspace", GridPerfMonitor()},
                                                           {"ConstructLinks", GridPerfMonitor()},
 #if defined(SAVE_BLOCKPROJECTS)
+                                                          {"InnerBlockSummation" , GridPerfMonitor()},
                                                           {"ShiftLinks", GridPerfMonitor()}
 #endif
                                                           };
