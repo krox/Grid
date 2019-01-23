@@ -587,7 +587,6 @@ namespace Grid {
 
         std::cout << GridLogMessage << "(" << i << ") .." << std::endl;
 
-#if defined(SAVE_DIRECTIONS)
         iblock = zeroFerm;
 
         for(int p = 0; p < _geom.npoint; p++) {
@@ -605,6 +604,7 @@ namespace Grid {
           }
           PerfMonitors["ApplyOp"].Stop();
 
+#if defined(SAVE_DIRECTIONS)
           PerfMonitors["InnerBlockSummation"].Start();
           iblock = iblock + where(iTmp[p] == 1, Mphi, zeroFerm);
           PerfMonitors["InnerBlockSummation"].Stop();
@@ -636,20 +636,6 @@ namespace Grid {
       }
       std::string saveDirections = "true";
 #else
-        for(int p = 0; p < _geom.npoint; p++) {
-          PerfMonitors["Misc"].Start();
-          int dir  = _geom.directions[p];
-          int disp = _geom.displacements[p];
-          PerfMonitors["Misc"].Stop();
-
-          PerfMonitors["ApplyOp"].Start();
-          if(disp == 0) {
-            linop.OpDiag(phi, Mphi);
-          } else {
-            linop.OpDir(phi, Mphi, dir, disp);
-          }
-          PerfMonitors["ApplyOp"].Stop();
-
           PerfMonitors["ProjectToSubspace"].Start();
           Aggregates.ProjectToSubspace(iProj, Mphi, iLut[p]);
           Aggregates.ProjectToSubspace(oProj, Mphi, oLut[p]);
@@ -790,7 +776,6 @@ namespace Grid {
 
         std::cout << GridLogMessage << "(" << i << ") .." << std::endl;
 
-#if defined(SAVE_DIRECTIONS)
         for(int k = 0; k < len; k++) iBlock[k] = zeroFerm;
 
         for(int p = 0; p < _geom.npoint; p++) {
@@ -807,6 +792,7 @@ namespace Grid {
           }
           PerfMonitors["ApplyOp"].Stop(len);
 
+#if defined(SAVE_DIRECTIONS)
           PerfMonitors["InnerBlockSummation"].Start();
           for(int k = 0; k < len; k++) iBlock[k] = iBlock[k] + where(iTmp[p] == 1, MphiSplit[k], zeroFerm);
           PerfMonitors["InnerBlockSummation"].Stop(len);
@@ -866,22 +852,6 @@ namespace Grid {
 
       std::string saveDirections = "true";
 #else
-        for(int p = 0; p < _geom.npoint; p++) {
-          PerfMonitors["Misc"].Start();
-          int dir  = _geom.directions[p];
-          int disp = _geom.displacements[p];
-          PerfMonitors["Misc"].Stop();
-
-          PerfMonitors["ApplyOp"].Start();
-          if(disp == 0) {
-            for(int k = 0; k < len; k++)
-              linop.OpDiag(phiSplit[k], MphiSplit[k]);
-          } else {
-            for(int k = 0; k < len; k++)
-              linop.OpDir(phiSplit[k], MphiSplit[k], dir, disp);
-          }
-          PerfMonitors["ApplyOp"].Stop(len);
-
           PerfMonitors["ProjectToSubspace"].Start();
           for(int k = 0; k < len; k++) {
             Aggregates.ProjectToSubspace(iProjSplit[k], MphiSplit[k], iLut[p]);
