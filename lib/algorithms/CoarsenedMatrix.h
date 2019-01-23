@@ -32,7 +32,7 @@ Author: paboyle <paboyle@ph.ed.ac.uk>
 #define  GRID_ALGORITHM_COARSENED_MATRIX_H
 
 
-#define SAVE_DIRECTIONS
+#define SAVE_BLOCKPROJECTS
 
 namespace Grid {
 
@@ -507,7 +507,7 @@ namespace Grid {
                                                           {"PickBlocks" , GridPerfMonitor()},
                                                           {"ProjectToSubspace" , GridPerfMonitor()},
                                                           {"ConstructLinks" , GridPerfMonitor()},
-#if defined(SAVE_DIRECTIONS)
+#if defined(SAVE_BLOCKPROJECTS)
                                                           {"ShiftLinks" , GridPerfMonitor()}
 #endif
                                                           };
@@ -604,7 +604,7 @@ namespace Grid {
           }
           PerfMonitors["ApplyOp"].Stop();
 
-#if defined(SAVE_DIRECTIONS)
+#if defined(SAVE_BLOCKPROJECTS)
           PerfMonitors["InnerBlockSummation"].Start();
           iblock = iblock + where(iTmp[p] == 1, Mphi, zeroFerm);
           PerfMonitors["InnerBlockSummation"].Stop();
@@ -634,7 +634,7 @@ namespace Grid {
           PerfMonitors["ConstructLinks"].Stop();
         }
       }
-      std::string saveDirections = "true";
+      std::string saveBlockProjects = "true";
 #else
           PerfMonitors["ProjectToSubspace"].Start();
           Aggregates.ProjectToSubspace(iProj, Mphi, iLut[p]);
@@ -653,11 +653,11 @@ namespace Grid {
           PerfMonitors["ConstructLinks"].Stop();
         }
       }
-      std::string saveDirections = "false";
+      std::string saveBlockProjects = "false";
 #endif
       PerfMonitors["Total"].Stop();
       std::cout << GridLogMessage << "***************************************************************************" << std::endl;
-      std::cout << GridLogMessage << "Time breakdown for CoarsenOperator with isTwoSpinVersion == false and saveDirections = " << saveDirections << std::endl;
+      std::cout << GridLogMessage << "Time breakdown for CoarsenOperator with isTwoSpinVersion == false and saveBlockProjects = " << saveBlockProjects << std::endl;
       std::cout << GridLogMessage << "***************************************************************************" << std::endl;
       printPerformanceMonitors(PerfMonitors);
     }
@@ -695,7 +695,7 @@ namespace Grid {
                                                           {"InnerBlockSummation", GridPerfMonitor()},
                                                           {"ProjectToSubspace", GridPerfMonitor()},
                                                           {"ConstructLinks", GridPerfMonitor()},
-#if defined(SAVE_DIRECTIONS)
+#if defined(SAVE_BLOCKPROJECTS)
                                                           {"ShiftLinks", GridPerfMonitor()}
 #endif
                                                           };
@@ -792,7 +792,7 @@ namespace Grid {
           }
           PerfMonitors["ApplyOp"].Stop(len);
 
-#if defined(SAVE_DIRECTIONS)
+#if defined(SAVE_BLOCKPROJECTS)
           PerfMonitors["InnerBlockSummation"].Start();
           for(int k = 0; k < len; k++) iBlock[k] = iBlock[k] + where(iTmp[p] == 1, MphiSplit[k], zeroFerm);
           PerfMonitors["InnerBlockSummation"].Stop(len);
@@ -850,7 +850,7 @@ namespace Grid {
       }
       PerfMonitors["ShiftLinks"].Stop();
 
-      std::string saveDirections = "true";
+      std::string saveBlockProjects = "true";
 #else
           PerfMonitors["ProjectToSubspace"].Start();
           for(int k = 0; k < len; k++) {
@@ -875,12 +875,12 @@ namespace Grid {
           PerfMonitors["ConstructLinks"].Stop();
         }
       }
-      std::string saveDirections = "false";
+      std::string saveBlockProjects = "false";
 #endif
 
       PerfMonitors["Total"].Stop();
       std::cout << GridLogMessage << "***************************************************************************" << std::endl;
-      std::cout << GridLogMessage << "Time breakdown for CoarsenOperator with isTwoSpinVersion == true and saveDirections = " << saveDirections << std::endl;
+      std::cout << GridLogMessage << "Time breakdown for CoarsenOperator with isTwoSpinVersion == true and saveBlockProjects = " << saveBlockProjects << std::endl;
       std::cout << GridLogMessage << "***************************************************************************" << std::endl;
       printPerformanceMonitors(PerfMonitors);
     }
