@@ -195,6 +195,15 @@ namespace Grid {
     strong_inline void multLinkKernel(SiteSpinor & res, std::vector<LinkField> const & Y, SiteSpinor const & nbr, int point, int ss) {
       res = res + Y[point]._odata[ss] * nbr;
     }
+
+    void orthogonaliseKernel(ScalarField & InnerProd, std::vector<FineFermionField> & BasisVecs) {
+      blockOrthogonalise(InnerProd, BasisVecs);
+    }
+
+    strong_inline void setToOneKernel(SiteSpinor &Vec, int i) {
+      SiteScalar tmp; tmp = 1.0;
+      Vec(i) = tmp;
+    }
   };
 
 
@@ -271,8 +280,58 @@ namespace Grid {
       //   res() = res() + Y._odata[ss](point) * nbr();
       res = res + Y[point]._odata[ss] * nbr;
     }
-  };
 
+    void orthogonaliseKernel(ScalarField &InnerProd, std::vector<FineFermionField> &BasisVecs) {
+      GridBase *            _coarseGrid = InnerProd._grid;
+      GridBase *            _fineGrid = BasisVecs[0]._grid;
+
+      subdivides(_coarseGrid, _fineGrid);
+      assert(Nbasis == BasisVecs.size());
+      for(int i = 0; i < Nbasis; i++) {
+        conformable(BasisVecs[i]._grid, _fineGrid);
+      }
+
+      CoarseningLookUpTable lookUpTable(_coarseGrid, _fineGrid);
+      int len = 2; // TODO: This must be something, not a hard-coded 2!
+
+      // Kernel fusion
+      parallel_region {
+        Vector<SiteScalar> alpha(len, zero); // NOTE: Using Vector instead of std::vector here is of utmost importance! (This cost me hours -.-')
+        Vector<SiteScalar> norm(len, zero);
+        parallel_for_internal(int sc = 0; sc < _coarseGrid->oSites(); sc++) {
+          for(int v = 0; v < Nbasis; v++) {
+            for(int u = 0; u < v; u++) {
+              for(int k = 0; k < len; k++) alpha[k] = zero;
+
+              for(int sf : lookUpTable()[sc])
+                for(int s = 0; s < Nfs; s++)
+                  alpha[s / Nsb]()() = alpha[s / Nsb]()() + innerProduct(BasisVecs[u]._odata[sf]()(s), BasisVecs[v]._odata[sf]()(s));
+
+              for(int sf : lookUpTable()[sc])
+                for(int s = 0; s < Nfs; s++)
+                  BasisVecs[v]._odata[sf]()(s) = BasisVecs[v]._odata[sf]()(s) - alpha[s / Nsb]()() * BasisVecs[u]._odata[sf]()(s);
+            }
+
+            for(int k = 0; k < len; k++) norm[k] = zero;
+
+            for(int sf : lookUpTable()[sc])
+              for(int s = 0; s < Nfs; s++)
+                norm[s / Nsb]()() = norm[s / Nsb]()() + innerProduct(BasisVecs[v]._odata[sf]()(s), BasisVecs[v]._odata[sf]()(s));
+
+            for(int k = 0; k < len; k++) norm[k] = pow(norm[k], -0.5);
+
+            for(int sf : lookUpTable()[sc])
+              for(int s = 0; s < Nfs; s++) BasisVecs[v]._odata[sf]()(s) = norm[s / Nsb]()() * BasisVecs[v]._odata[sf]()(s);
+          }
+        }
+      }
+    }
+
+    strong_inline void setToOneKernel(SiteSpinor &Vec, int i) {
+      for(int s = 0; s < Ncs; s++)
+        Vec()(s)(i) = Simd(1.0);
+    }
+  };
 
   template<class CoarseningPolicy>
   class AggregationUsingPolicies : public CoarseningPolicy {
@@ -304,6 +363,31 @@ namespace Grid {
       , _subspace(Nbasis, FineGrid)
       , _checkerBoard(CheckerBoard) {
       subdivides(_coarseGrid, _fineGrid);
+    }
+
+    void Orthogonalise(void) {
+      ScalarField InnerProd(_coarseGrid);
+      std::cout << GridLogMessage << "Gram-Schmidt pass 1" << std::endl;
+      CoarseningPolicy::orthogonaliseKernel(InnerProd, _subspace);
+      std::cout << GridLogMessage << "Gram-Schmidt pass 2" << std::endl;
+      CoarseningPolicy::orthogonaliseKernel(InnerProd, _subspace);
+      // std::cout << GridLogMessage << "Gram-Schmidt checking orthogonality" << std::endl;
+      // CheckOrthogonal();
+    }
+    void CheckOrthogonal(void) {
+      FermionField iProj(_coarseGrid);
+      FermionField eProj(_coarseGrid);
+      CoarseningLookUpTable lookUpTable(_coarseGrid, _fineGrid);
+      for(int i = 0; i < Nbasis; i++) {
+        ProjectToSubspace(iProj, _subspace[i], lookUpTable);
+        eProj = zero;
+        parallel_for(int ss = 0; ss < _coarseGrid->oSites(); ss++) {
+          CoarseningPolicy::setToOneKernel(eProj._odata[ss], i);
+        }
+        eProj = eProj - iProj;
+        std::cout << GridLogMessage << "Orthog check error " << i << " " << norm2(eProj) << std::endl;
+      }
+      std::cout << GridLogMessage << "CheckOrthog done" << std::endl;
     }
 
     // This function overload is done in analogy to that of the original "blockProject"
@@ -957,8 +1041,8 @@ namespace Grid {
       CoarseVector iProj(CoarseGrid); 
       CoarseVector eProj(CoarseGrid); 
       for(int i=0;i<nbasis;i++){
-	OriginalImpl::blockProject(iProj,subspace[i],subspace);
-	eProj=zero; 
+	ProjectToSubspace(iProj, subspace[i]);
+	eProj=zero;
 	parallel_for(int ss=0;ss<CoarseGrid->oSites();ss++){
 	  eProj._odata[ss](i)=CComplex(1.0);
 	}
