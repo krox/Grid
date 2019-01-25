@@ -292,16 +292,15 @@ namespace Grid {
       }
 
       CoarseningLookUpTable lookUpTable(_coarseGrid, _fineGrid);
-      int len = 2; // TODO: This must be something, not a hard-coded 2!
 
       // Kernel fusion
       parallel_region {
-        Vector<SiteScalar> alpha(len, zero); // NOTE: Using Vector instead of std::vector here is of utmost importance! (This cost me hours -.-')
-        Vector<SiteScalar> norm(len, zero);
+        Vector<SiteScalar> alpha(Ncs, zero); // NOTE: Using Vector instead of std::vector here is of utmost importance! (This cost me hours -.-')
+        Vector<SiteScalar> norm(Ncs, zero);
         parallel_for_internal(int sc = 0; sc < _coarseGrid->oSites(); sc++) {
           for(int v = 0; v < Nbasis; v++) {
             for(int u = 0; u < v; u++) {
-              for(int k = 0; k < len; k++) alpha[k] = zero;
+              for(int k = 0; k < Ncs; k++) alpha[k] = zero;
 
               for(int sf : lookUpTable()[sc])
                 for(int s = 0; s < Nfs; s++)
@@ -312,13 +311,13 @@ namespace Grid {
                   BasisVecs[v]._odata[sf]()(s) = BasisVecs[v]._odata[sf]()(s) - alpha[s / Nsb]()() * BasisVecs[u]._odata[sf]()(s);
             }
 
-            for(int k = 0; k < len; k++) norm[k] = zero;
+            for(int k = 0; k < Ncs; k++) norm[k] = zero;
 
             for(int sf : lookUpTable()[sc])
               for(int s = 0; s < Nfs; s++)
                 norm[s / Nsb]()() = norm[s / Nsb]()() + innerProduct(BasisVecs[v]._odata[sf]()(s), BasisVecs[v]._odata[sf]()(s));
 
-            for(int k = 0; k < len; k++) norm[k] = pow(norm[k], -0.5);
+            for(int k = 0; k < Ncs; k++) norm[k] = pow(norm[k], -0.5);
 
             for(int sf : lookUpTable()[sc])
               for(int s = 0; s < Nfs; s++) BasisVecs[v]._odata[sf]()(s) = norm[s / Nsb]()() * BasisVecs[v]._odata[sf]()(s);
@@ -598,7 +597,6 @@ namespace Grid {
 
       PerfMonitors["Total"].Start();
       PerfMonitors["Misc"].Start();
-
       FineFermionField phi(FineGrid);
       FineFermionField zeroFerm(FineGrid); zeroFerm = zero;
       FineFermionField Mphi(FineGrid);
@@ -772,13 +770,12 @@ namespace Grid {
 
     template <bool isTwoSpinVersion, typename std::enable_if<isTwoSpinVersion == true>::type *  = nullptr>
     void extractChiralComponents(std::vector<FineFermionField> &extracted, FineFermionField const &in) {
-      auto len = 2; // TODO: This should either be Ncs or Nsb, not a hard-coded 2
-      assert(extracted.size() == len);
+      assert(extracted.size() == Ncs);
 
-      for(int k = 0; k < len; k++)
+      for(int k = 0; k < Ncs; k++)
         conformable(in._grid, extracted[k]._grid);
 
-      for(int k = 0; k < len; k++) extracted[k] = zero;
+      for(int k = 0; k < Ncs; k++) extracted[k] = zero;
 
 #define SpinIndex 1 // Need to do this temporarily, will be removed once the QCD namespace is gone
       parallel_for(int ss = 0; ss < in._grid->oSites(); ss++) {
@@ -810,16 +807,13 @@ namespace Grid {
 
       PerfMonitors["Total"].Start();
       PerfMonitors["Misc"].Start();
-
-      auto len = 2; // TODO: This should either be Ncs or Nsb, not a hard-coded 2
-
       FineFermionField zeroFerm(FineGrid); zeroFerm = zero;
-      std::vector<FineFermionField> phiSplit(len, FineGrid);
-      std::vector<FineFermionField> MphiSplit(len, FineGrid);
-      std::vector<FineFermionField> iBlock(len, FineGrid);
+      std::vector<FineFermionField> phiSplit(Ncs, FineGrid);
+      std::vector<FineFermionField> MphiSplit(Ncs, FineGrid);
+      std::vector<FineFermionField> iBlock(Ncs, FineGrid);
 
-      std::vector<FermionField> iProjSplit(len, Grid());
-      std::vector<FermionField> oProjSplit(len, Grid());
+      std::vector<FermionField> iProjSplit(Ncs, Grid());
+      std::vector<FermionField> oProjSplit(Ncs, Grid());
 
       FineScalarField oneScalar(FineGrid); oneScalar = 1.;
       FineScalarField zeroScalar(FineGrid); zeroScalar = zero;
@@ -884,7 +878,7 @@ namespace Grid {
 
         std::cout << GridLogMessage << "(" << i << ") .." << std::endl;
 
-        for(int k = 0; k < len; k++) iBlock[k] = zeroFerm;
+        for(int k = 0; k < Ncs; k++) iBlock[k] = zeroFerm;
 
         for(int p = 0; p < _geom.npoint; p++) {
             PerfMonitors["Misc"].Start();
@@ -894,25 +888,25 @@ namespace Grid {
 
           PerfMonitors["ApplyOp"].Start();
           if(disp == 0) {
-            for(int k = 0; k < len; k++) linop.OpDiag(phiSplit[k], MphiSplit[k]);
+            for(int k = 0; k < Ncs; k++) linop.OpDiag(phiSplit[k], MphiSplit[k]);
           } else {
-            for(int k = 0; k < len; k++) linop.OpDir(phiSplit[k], MphiSplit[k], dir, disp);
+            for(int k = 0; k < Ncs; k++) linop.OpDir(phiSplit[k], MphiSplit[k], dir, disp);
           }
-          PerfMonitors["ApplyOp"].Stop(len);
+          PerfMonitors["ApplyOp"].Stop(Ncs);
 
 #if defined(SAVE_BLOCKPROJECTS)
           PerfMonitors["InnerBlockSummation"].Start();
-          for(int k = 0; k < len; k++) iBlock[k] = iBlock[k] + where(iTmp[p] == 1, MphiSplit[k], zeroFerm);
-          PerfMonitors["InnerBlockSummation"].Stop(len);
+          for(int k = 0; k < Ncs; k++) iBlock[k] = iBlock[k] + where(iTmp[p] == 1, MphiSplit[k], zeroFerm);
+          PerfMonitors["InnerBlockSummation"].Stop(Ncs);
 
           PerfMonitors["ProjectToSubspace"].Start();
           auto numProject = 0;
           if(p == self_stencil) { // NOTE: Here, we rely on the self-stencil point being the last in the list. This code will break if it isn't!
-            numProject += len;
-            for(int k = 0; k < len; k++) Aggregates.ProjectToSubspace(iProjSplit[k], iBlock[k], iLut[p]);
+            numProject += Ncs;
+            for(int k = 0; k < Ncs; k++) Aggregates.ProjectToSubspace(iProjSplit[k], iBlock[k], iLut[p]);
           } else if(disp == +1) {
-            numProject += len;
-            for(int k = 0; k < len; k++) Aggregates.ProjectToSubspace(oProjSplit[k], MphiSplit[k], oLut[p]);
+            numProject += Ncs;
+            for(int k = 0; k < Ncs; k++) Aggregates.ProjectToSubspace(oProjSplit[k], MphiSplit[k], oLut[p]);
           }
           PerfMonitors["ProjectToSubspace"].Stop(numProject); // TODO: This counts the number of calls correctly, but these are no full projections any longer -> Think about what number to put here
 
@@ -920,13 +914,13 @@ namespace Grid {
           parallel_for(int ss = 0; ss < Grid()->oSites(); ss++) {
             for(int j = 0; j < Nbasis; j++) {
               if(p == self_stencil) { // NOTE: Here, we rely on the self-stencil point being the last in the list. This code will break if it isn't!
-                for(int k = 0; k < len; k++)
-                  for(int l = 0; l < len; l++)
+                for(int k = 0; k < Ncs; k++)
+                  for(int l = 0; l < Ncs; l++)
                     _Y[self_stencil]._odata[ss]()(l, k)(j, i) = _Y[self_stencil]._odata[ss]()(l, k)(j, i) + iProjSplit[k]._odata[ss]()(l)(j);
               }
               if(disp == +1) {
-                for(int k = 0; k < len; k++)
-                  for(int l = 0; l < len; l++) _Y[p]._odata[ss]()(l, k)(j, i) = oProjSplit[k]._odata[ss]()(l)(j);
+                for(int k = 0; k < Ncs; k++)
+                  for(int l = 0; l < Ncs; l++) _Y[p]._odata[ss]()(l, k)(j, i) = oProjSplit[k]._odata[ss]()(l)(j);
               }
             }
           }
@@ -942,8 +936,8 @@ namespace Grid {
           auto tmp = adj(_Y[p]);
           parallel_for(auto ss = tmp.begin(); ss < tmp.end(); ss++) { // TODO: Is there a fancier way to do this?
             Real factor;
-            for(int k = 0; k < len; k++) {
-              for(int l = 0; l < len; l++) {
+            for(int k = 0; k < Ncs; k++) {
+              for(int l = 0; l < Ncs; l++) {
                 if((k + l) % 2 == 1) {
                   factor = -1.;
                 } else {
@@ -961,22 +955,22 @@ namespace Grid {
       std::string saveBlockProjects = "true";
 #else
           PerfMonitors["ProjectToSubspace"].Start();
-          for(int k = 0; k < len; k++) {
+          for(int k = 0; k < Ncs; k++) {
             Aggregates.ProjectToSubspace(iProjSplit[k], MphiSplit[k], iLut[p]);
             Aggregates.ProjectToSubspace(oProjSplit[k], MphiSplit[k], oLut[p]);
           }
-          PerfMonitors["ProjectToSubspace"].Stop(len*2);
+          PerfMonitors["ProjectToSubspace"].Stop(Ncs*2);
 
           PerfMonitors["ConstructLinks"].Start();
           parallel_for(int ss = 0; ss < Grid()->oSites(); ss++) {
             for(int j = 0; j < Nbasis; j++) {
               if(disp != 0) {
-                for(int k = 0; k < len; k++)
-                  for(int l = 0; l < len; l++)
+                for(int k = 0; k < Ncs; k++)
+                  for(int l = 0; l < Ncs; l++)
                     _Y[p]._odata[ss]()(l, k)(j, i) = oProjSplit[k]._odata[ss]()(l)(j);
               }
-              for(int k = 0; k < len; k++)
-                for(int l = 0; l < len; l++)
+              for(int k = 0; k < Ncs; k++)
+                for(int l = 0; l < Ncs; l++)
                   _Y[self_stencil]._odata[ss]()(l, k)(j, i) = _Y[self_stencil]._odata[ss]()(l, k)(j, i) + iProjSplit[k]._odata[ss]()(l)(j);
             }
           }
