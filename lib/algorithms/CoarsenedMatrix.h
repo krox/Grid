@@ -370,8 +370,8 @@ namespace Grid {
       CoarseningPolicy::orthogonaliseKernel(InnerProd, _subspace);
       std::cout << GridLogMessage << "Gram-Schmidt pass 2" << std::endl;
       CoarseningPolicy::orthogonaliseKernel(InnerProd, _subspace);
-      // std::cout << GridLogMessage << "Gram-Schmidt checking orthogonality" << std::endl;
-      // CheckOrthogonal();
+      std::cout << GridLogMessage << "Gram-Schmidt checking orthogonality" << std::endl;
+      CheckOrthogonal();
     }
     void CheckOrthogonal(void) {
       FermionField iProj(_coarseGrid);
@@ -1028,8 +1028,8 @@ namespace Grid {
       OriginalImpl::blockOrthogonalise(InnerProd,subspace);
       std::cout << GridLogMessage <<" Gramm-Schmidt pass 2"<<std::endl;
       OriginalImpl::blockOrthogonalise(InnerProd,subspace);
-      //      std::cout << GridLogMessage <<" Gramm-Schmidt checking orthogonality"<<std::endl;
-      //      CheckOrthogonal();
+      std::cout << GridLogMessage <<" Gramm-Schmidt checking orthogonality"<<std::endl;
+      CheckOrthogonal();
     } 
     void CheckOrthogonal(void){
       CoarseVector iProj(CoarseGrid); 
