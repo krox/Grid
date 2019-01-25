@@ -1057,7 +1057,7 @@ namespace Grid {
 	random(RNG,subspace[i]);
 	std::cout<<GridLogMessage<<" norm subspace["<<i<<"] "<<norm2(subspace[i])<<std::endl;
       }
-      Orthogonalise();
+      // Orthogonalise();
     }
 
     /*
