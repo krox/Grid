@@ -297,7 +297,7 @@ inline void blockInnerProduct(Lattice<CComplex> &CoarseInner,
                               const Lattice<vobj> &fineY,
                               const CoarseningLookUpTable &lookUpTable)
 {
-  std::cout << GridLogDebug << "New implementation of " << __FUNCTION__ << " called" << std::endl;
+  std::cout << GridLogDebug << "New implementation of " << __FUNCTION__ << " with 4 (= more) args called" << std::endl;
   typedef decltype(innerProduct(fineX._odata[0],fineY._odata[0])) dotp;
 
   GridBase *coarse(CoarseInner._grid);

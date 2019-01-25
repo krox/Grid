@@ -716,6 +716,8 @@ namespace Grid {
           PerfMonitors["ConstructLinks"].Stop();
         }
       }
+      // Relation between forward and backward link matrices taken from M. Rottmann's PHD thesis:
+      // D_{A_{q,\kappa}, A_{p,\tau}} = - D^\dag_{A_{p,\tau}, A_{q,\kappa}}
       PerfMonitors["ShiftLinks"].Start();
       for(int p = 0; p < _geom.npoint; p++) {
         if(_geom.displacements[p] == +1) {
@@ -927,7 +929,6 @@ namespace Grid {
           PerfMonitors["ConstructLinks"].Stop();
         }
       }
-      // This is the version for the old layout of Y
       // Relation between forward and backward link matrices taken from M. Rottmann's PHD thesis:
       // D_{A_{q,\kappa}, A_{p,\tau}} = - D^\dag_{A_{p,\tau}, A_{q,\kappa}}
       PerfMonitors["ShiftLinks"].Start();
