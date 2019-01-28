@@ -32,6 +32,7 @@ Author: Peter Boyle <paboyle@ph.ed.ac.uk>
 #include <sys/time.h>
 #include <ctime>
 #include <chrono>
+#include <map>
 
 namespace Grid {
 
@@ -197,5 +198,14 @@ inline std::ostream& operator<< (std::ostream & stream, const GridPerfMonitor & 
   return stream;
 }
 
+inline std::ostream& operator<<(std::ostream & stream, std::map<std::string, GridPerfMonitor> & perfMonitors) {
+  for(auto &elem : perfMonitors)
+    stream << "Kernel "
+           << std::setw(25) << std::right
+           << elem.first << ": " << elem.second
+           << " Fraction[%] = " << std::fixed << 100 * elem.second.Seconds() / perfMonitors["Total"].Seconds()
+           << std::endl;
+  return stream;
+}
 }
 #endif

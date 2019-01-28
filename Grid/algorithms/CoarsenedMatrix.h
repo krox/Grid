@@ -35,12 +35,6 @@ Author: paboyle <paboyle@ph.ed.ac.uk>
 
 namespace Grid {
 
-  void printPerformanceMonitors(std::map<std::string, GridPerfMonitor> &perfMonitors) {
-    for(auto &elem : perfMonitors)
-      std::cout << GridLogPerformance << "Kernel " << std::setw(25) << std::right << elem.first << ": " << elem.second
-                << " Fraction[%] = " << std::fixed << 100 * elem.second.Seconds() / perfMonitors["Total"].Seconds() << std::endl;
-  }
-
   class Geometry {
     //    int dimension;
   public:
@@ -767,7 +761,7 @@ namespace Grid {
       std::cout << GridLogMessage << "***************************************************************************" << std::endl;
       std::cout << GridLogMessage << "Time breakdown for CoarsenOperator with isTwoSpinVersion == false and saveBlockProjects = " << saveBlockProjects << std::endl;
       std::cout << GridLogMessage << "***************************************************************************" << std::endl;
-      printPerformanceMonitors(PerfMonitors);
+      std::cout << GridLogPerformance << PerfMonitors;
     }
 
     template <bool isTwoSpinVersion, typename std::enable_if<isTwoSpinVersion == true>::type *  = nullptr>
@@ -985,7 +979,7 @@ namespace Grid {
       std::cout << GridLogMessage << "***************************************************************************" << std::endl;
       std::cout << GridLogMessage << "Time breakdown for CoarsenOperator with isTwoSpinVersion == true and saveBlockProjects = " << saveBlockProjects << std::endl;
       std::cout << GridLogMessage << "***************************************************************************" << std::endl;
-      printPerformanceMonitors(PerfMonitors);
+      std::cout << GridLogPerformance << PerfMonitors;
     }
 
     void CoarsenOperator(GridBase *FineGrid, LinearOperatorBase<FineFermionField> &linop, AggregationUsingPolicies<CoarseningPolicy> &Aggregates) {
@@ -1389,7 +1383,7 @@ namespace Grid {
       std::cout << GridLogMessage << "***************************************************************************" << std::endl;
       std::cout << GridLogMessage << "Time breakdown for CoarsenOperator for original implementation" << std::endl;
       std::cout << GridLogMessage << "***************************************************************************" << std::endl;
-      printPerformanceMonitors(PerfMonitors);
+      std::cout << GridLogPerformance << PerfMonitors;
 
 #if 0
       ///////////////////////////
