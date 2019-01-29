@@ -538,8 +538,15 @@ namespace Grid {
     }
 
     RealD Mdag(const FermionField &in, FermionField &out) {
-      // TODO
-      return RealD();
+      // // corresponds to Petrov-Galerkin coarsening
+      // return M(in,out);
+
+      // corresponds to Galerkin coarsening
+      FermionField tmp(Grid());
+      G5C(tmp, in);
+      M(tmp, out);
+      G5C(out, out);
+      return norm2(out);
     }
 
     void Mdiag(const FermionField &in, FermionField &out){

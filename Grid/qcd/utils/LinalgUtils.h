@@ -207,5 +207,18 @@ void G5C(Lattice<iVector<CComplex, nbasis>> &z, const Lattice<iVector<CComplex, 
   }
 }
 
+// The explicit 2 is ugly but I couldn't get it done in another way atm
+template<class Simd, int nbasis>
+void G5C(Lattice<iScalar<iVector<iVector<Simd, nbasis>, 2>>> &z,
+         const Lattice<iScalar<iVector<iVector<Simd, nbasis>, 2>>> &x) {
+  GridBase *grid = x._grid;
+  z.checkerboard = x.checkerboard;
+  conformable(x, z);
+
+  parallel_for(int ss = 0; ss < grid->oSites(); ss++) {
+    z._odata[ss]()(0) =  x._odata[ss]()(0);
+    z._odata[ss]()(1) = -x._odata[ss]()(1);
+  }
+}
 }
 #endif 

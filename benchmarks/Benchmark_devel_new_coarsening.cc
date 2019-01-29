@@ -275,6 +275,17 @@ int main(int argc, char **argv) {
   double flopTwoSpinM  = CVolume * ((nStencil * (8 * twoSpinCSiteElems * twoSpinCSiteElems - 2 * twoSpinCSiteElems) + nAccum * 2 * twoSpinCSiteElems) + 8 * twoSpinCSiteElems);
   double byteTwoSpinM  = CVolume * ((nStencil * (twoSpinCSiteElems * twoSpinCSiteElems + twoSpinCSiteElems) + twoSpinCSiteElems) + twoSpinCSiteElems) * sizeof(Complex);
 
+  // Mdag
+
+  double flopOriginalMdag = 0.; // TODO
+  double byteOriginalMdag = 0.; // TODO
+
+  double flopOneSpinMdag  = 0.; // TODO
+  double byteOneSpinMdag  = 0.; // TODO
+
+  double flopTwoSpinMdag  = 0.; // TODO
+  double byteTwoSpinMdag  = 0.; // TODO
+
   // Mdir
 
   double flopOriginalMdir = CVolume * (8 * originalCSiteElems * originalCSiteElems - 2 * originalCSiteElems);
@@ -349,6 +360,21 @@ int main(int argc, char **argv) {
   BenchmarkFunction(originalCoarsenedMatrix.M, flopOriginalM, byteOriginalM, nIter, originalCoarseVectorIn, originalCoarseVectorOut);
   BenchmarkFunction(oneSpinCoarsenedMatrix.M,  flopOneSpinM,  byteOneSpinM,  nIter, oneSpinCoarseVectorIn,  oneSpinCoarseVectorOut);
   BenchmarkFunction(twoSpinCoarsenedMatrix.M,  flopTwoSpinM,  byteTwoSpinM,  nIter, twoSpinCoarseVectorIn,  twoSpinCoarseVectorOut);
+
+  compareToResultInOriginalLayout<OneSpinCoarsenedMatrix>(originalCoarseVectorOut, oneSpinCoarseVectorOut);
+  compareToResultInOriginalLayout<TwoSpinCoarsenedMatrix>(originalCoarseVectorOut, twoSpinCoarseVectorOut);
+
+  std::cout << GridLogMessage << "***************************************************************************" << std::endl;
+  std::cout << GridLogMessage << "Performance figures and result comparison for benchmark coarse Mdag" << std::endl;
+  std::cout << GridLogMessage << "***************************************************************************" << std::endl;
+
+  originalCoarseVectorOut = zero;
+  oneSpinCoarseVectorOut  = zero;
+  twoSpinCoarseVectorOut  = zero;
+
+  BenchmarkFunction(originalCoarsenedMatrix.Mdag, flopOriginalMdag, byteOriginalMdag, nIter, originalCoarseVectorIn, originalCoarseVectorOut);
+  BenchmarkFunction(oneSpinCoarsenedMatrix.Mdag,  flopOneSpinMdag,  byteOneSpinMdag,  nIter, oneSpinCoarseVectorIn,  oneSpinCoarseVectorOut);
+  BenchmarkFunction(twoSpinCoarsenedMatrix.Mdag,  flopTwoSpinMdag,  byteTwoSpinMdag,  nIter, twoSpinCoarseVectorIn,  twoSpinCoarseVectorOut);
 
   compareToResultInOriginalLayout<OneSpinCoarsenedMatrix>(originalCoarseVectorOut, oneSpinCoarseVectorOut);
   compareToResultInOriginalLayout<TwoSpinCoarsenedMatrix>(originalCoarseVectorOut, twoSpinCoarseVectorOut);
