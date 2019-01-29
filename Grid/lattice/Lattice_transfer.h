@@ -1420,6 +1420,7 @@ inline void blockOrthogonalise(Lattice<CComplex> &ip,std::vector<Lattice<vobj> >
       ip = -ip;
       Grid::OriginalImpl::blockZAXPY<vobj,CComplex> (Basis[v],ip,Basis[u],Basis[v]);
     }
+    Grid::OriginalImpl::blockNormalise(ip, Basis[v]);
   }
 }
 
