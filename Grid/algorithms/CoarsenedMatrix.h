@@ -36,15 +36,17 @@ Author: paboyle <paboyle@ph.ed.ac.uk>
 namespace Grid {
 
   class Geometry {
-    //    int dimension;
   public:
+    int ndimension;
     int npoint;
     std::vector<int> directions   ;
     std::vector<int> displacements;
 
   Geometry(int _d)  {
+
+      ndimension = _d;
   
-      int base = (_d==5) ? 1:0;
+      int base = Base();
 
       // make coarse grid stencil for 4d , not 5d
       if ( _d==5 ) _d=4;
@@ -70,18 +72,27 @@ namespace Grid {
       std::cout<<std::endl;
     }
   
-    int PointFromDirDisp(int dir, int disp) {
+    int PointFromDirDisp(int dir, int disp) const {
       int _d = (npoint - 1) / 2;
+      int base = Base();
+
       assert(disp == -1 || disp == 0 || disp == 1);
-      assert(0 <= dir && dir < _d);
+      if (ndimension == 4) assert(0 <= dir && dir < _d);
+      else if (ndimension == 5) assert(0 <= dir && dir <= _d);
+
       if(dir == 0 and disp == 0)
         return 2*_d;
       else
-        return (_d * dir + 1 - disp) / 2;
+        return (_d * (dir - base) + 1 - disp) / 2;
     }
 
-    int SelfStencilPoint() {
+    int SelfStencilPoint() const {
       return npoint - 1;
+    }
+
+  private:
+    int Base() const {
+      return (ndimension == 5) ? 1 : 0;
     }
 
     /*
