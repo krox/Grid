@@ -46,6 +46,7 @@ class CommunicationAvoidingGeneralisedMinimalResidual : public OperatorFunction<
                           // filled in upon completion
 
   GridStopWatch MatrixTimer;
+  GridStopWatch OrthogTimer;
   GridStopWatch LinalgTimer;
   GridStopWatch QrTimer;
   GridStopWatch CompSolutionTimer;
@@ -94,6 +95,7 @@ class CommunicationAvoidingGeneralisedMinimalResidual : public OperatorFunction<
     std::cout << GridLogIterative << "CommunicationAvoidingGeneralisedMinimalResidual:   src " << ssq   << std::endl;
 
     MatrixTimer.Reset();
+    OrthogTimer.Reset();
     LinalgTimer.Reset();
     QrTimer.Reset();
     CompSolutionTimer.Reset();
@@ -127,6 +129,7 @@ class CommunicationAvoidingGeneralisedMinimalResidual : public OperatorFunction<
 
         std::cout << GridLogMessage << "CAGMRES Time elapsed: Total   " <<       SolverTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "CAGMRES Time elapsed: Matrix  " <<       MatrixTimer.Elapsed() << std::endl;
+        std::cout << GridLogMessage << "CAGMRES Time elapsed: Orthog  " <<       OrthogTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "CAGMRES Time elapsed: Linalg  " <<       LinalgTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "CAGMRES Time elapsed: QR      " <<           QrTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "CAGMRES Time elapsed: CompSol " << CompSolutionTimer.Elapsed() << std::endl;
@@ -196,7 +199,7 @@ class CommunicationAvoidingGeneralisedMinimalResidual : public OperatorFunction<
     LinOp.Op(v[iter], w);
     MatrixTimer.Stop();
 
-    LinalgTimer.Start();
+    OrthogTimer.Start();
     for (int i = 0; i <= iter; ++i) {
       H(iter, i) = innerProduct(v[i], w);
       w = w - H(iter, i) * v[i];
@@ -204,7 +207,7 @@ class CommunicationAvoidingGeneralisedMinimalResidual : public OperatorFunction<
 
     H(iter, iter + 1) = sqrt(norm2(w));
     v[iter + 1] = (1. / H(iter, iter + 1)) * w;
-    LinalgTimer.Stop();
+    OrthogTimer.Stop();
   }
 
   void qrUpdate(int iter) {

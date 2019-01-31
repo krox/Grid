@@ -47,6 +47,7 @@ class FlexibleGeneralisedMinimalResidual : public OperatorFunction<Field> {
 
   GridStopWatch MatrixTimer;
   GridStopWatch PrecTimer;
+  GridStopWatch OrthogTimer;
   GridStopWatch LinalgTimer;
   GridStopWatch QrTimer;
   GridStopWatch CompSolutionTimer;
@@ -98,6 +99,7 @@ class FlexibleGeneralisedMinimalResidual : public OperatorFunction<Field> {
 
     PrecTimer.Reset();
     MatrixTimer.Reset();
+    OrthogTimer.Reset();
     LinalgTimer.Reset();
     QrTimer.Reset();
     CompSolutionTimer.Reset();
@@ -132,6 +134,7 @@ class FlexibleGeneralisedMinimalResidual : public OperatorFunction<Field> {
         std::cout << GridLogMessage << "FGMRES Time elapsed: Total   " <<       SolverTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "FGMRES Time elapsed: Precon  " <<         PrecTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "FGMRES Time elapsed: Matrix  " <<       MatrixTimer.Elapsed() << std::endl;
+        std::cout << GridLogMessage << "FGMRES Time elapsed: Orthog  " <<       OrthogTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "FGMRES Time elapsed: Linalg  " <<       LinalgTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "FGMRES Time elapsed: QR      " <<           QrTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "FGMRES Time elapsed: CompSol " << CompSolutionTimer.Elapsed() << std::endl;
@@ -206,7 +209,7 @@ class FlexibleGeneralisedMinimalResidual : public OperatorFunction<Field> {
     LinOp.Op(z[iter], w);
     MatrixTimer.Stop();
 
-    LinalgTimer.Start();
+    OrthogTimer.Start();
     for (int i = 0; i <= iter; ++i) {
       H(iter, i) = innerProduct(v[i], w);
       w = w - H(iter, i) * v[i];
@@ -214,7 +217,7 @@ class FlexibleGeneralisedMinimalResidual : public OperatorFunction<Field> {
 
     H(iter, iter + 1) = sqrt(norm2(w));
     v[iter + 1] = (1. / H(iter, iter + 1)) * w;
-    LinalgTimer.Stop();
+    OrthogTimer.Stop();
   }
 
   void qrUpdate(int iter) {

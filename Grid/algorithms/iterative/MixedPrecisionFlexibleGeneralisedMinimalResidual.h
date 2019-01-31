@@ -47,6 +47,7 @@ class MixedPrecisionFlexibleGeneralisedMinimalResidual : public OperatorFunction
 
   GridStopWatch MatrixTimer;
   GridStopWatch PrecTimer;
+  GridStopWatch OrthogTimer;
   GridStopWatch LinalgTimer;
   GridStopWatch QrTimer;
   GridStopWatch CompSolutionTimer;
@@ -103,6 +104,7 @@ class MixedPrecisionFlexibleGeneralisedMinimalResidual : public OperatorFunction
 
     PrecTimer.Reset();
     MatrixTimer.Reset();
+    OrthogTimer.Reset();
     LinalgTimer.Reset();
     QrTimer.Reset();
     CompSolutionTimer.Reset();
@@ -138,6 +140,7 @@ class MixedPrecisionFlexibleGeneralisedMinimalResidual : public OperatorFunction
         std::cout << GridLogMessage << "MPFGMRES Time elapsed: Total      " <<       SolverTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "MPFGMRES Time elapsed: Precon     " <<         PrecTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "MPFGMRES Time elapsed: Matrix     " <<       MatrixTimer.Elapsed() << std::endl;
+        std::cout << GridLogMessage << "MPFGMRES Time elapsed: Orthog     " <<       OrthogTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "MPFGMRES Time elapsed: Linalg     " <<       LinalgTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "MPFGMRES Time elapsed: QR         " <<           QrTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "MPFGMRES Time elapsed: CompSol    " << CompSolutionTimer.Elapsed() << std::endl;
@@ -225,7 +228,7 @@ class MixedPrecisionFlexibleGeneralisedMinimalResidual : public OperatorFunction
     LinOp.Op(z[iter], w);
     MatrixTimer.Stop();
 
-    LinalgTimer.Start();
+    OrthogTimer.Start();
     for (int i = 0; i <= iter; ++i) {
       H(iter, i) = innerProduct(v[i], w);
       w = w - H(iter, i) * v[i];
@@ -233,7 +236,7 @@ class MixedPrecisionFlexibleGeneralisedMinimalResidual : public OperatorFunction
 
     H(iter, iter + 1) = sqrt(norm2(w));
     v[iter + 1] = (1. / H(iter, iter + 1)) * w;
-    LinalgTimer.Stop();
+    OrthogTimer.Stop();
   }
 
   void qrUpdate(int iter) {
