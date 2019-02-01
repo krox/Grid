@@ -275,16 +275,16 @@ int main(int argc, char **argv) {
   double flopTwoSpinM  = CVolume * ((nStencil * (8 * twoSpinCSiteElems * twoSpinCSiteElems - 2 * twoSpinCSiteElems) + nAccum * 2 * twoSpinCSiteElems) + 8 * twoSpinCSiteElems);
   double byteTwoSpinM  = CVolume * ((nStencil * (twoSpinCSiteElems * twoSpinCSiteElems + twoSpinCSiteElems) + twoSpinCSiteElems) + twoSpinCSiteElems) * sizeof(Complex);
 
-  // Mdag
+  // Mdag NOTE: These refer to Galerkin coarsening, i.e., Mdag = g5c * M * g5c
 
-  double flopOriginalMdag = 0.; // TODO
-  double byteOriginalMdag = 0.; // TODO
+  double flopOriginalMdag = flopOriginalM + 2 * CVolume * (3 * originalCSiteElems);
+  double byteOriginalMdag = byteOriginalM + 2 * CVolume * (3 * originalCSiteElems) * sizeof(Complex);
 
-  double flopOneSpinMdag  = 0.; // TODO
-  double byteOneSpinMdag  = 0.; // TODO
+  double flopOneSpinMdag  = flopOneSpinM  + 2 * CVolume * (3 * oneSpinCSiteElems);
+  double byteOneSpinMdag  = byteOneSpinM  + 2 * CVolume * (3 * oneSpinCSiteElems) * sizeof(Complex);
 
-  double flopTwoSpinMdag  = 0.; // TODO
-  double byteTwoSpinMdag  = 0.; // TODO
+  double flopTwoSpinMdag  = flopTwoSpinM  + 2 * CVolume * (3 * twoSpinCSiteElems);
+  double byteTwoSpinMdag  = byteTwoSpinM  + 2 * CVolume * (3 * twoSpinCSiteElems) * sizeof(Complex);
 
   // Mdir
 
