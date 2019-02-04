@@ -83,7 +83,10 @@ int main(int argc, char **argv) {
   LevelInfo levelInfo(FGrid, mgParams);
 
   // Note: We do chiral doubling, so actually only nbasis/2 full basis vectors are used
-  const int nbasis = NBASIS; static_assert((nbasis & 0x1) == 0, "");
+  const int nbasis = NBASIS;
+#if !defined(USE_TWOSPIN_COARSENING)
+  static_assert((nbasis & 0x1) == 0, "");
+#endif
 
   WilsonFermionR Dw(Umu, *FGrid, *FrbGrid, mass);
 
@@ -94,7 +97,13 @@ int main(int argc, char **argv) {
   std::cout << GridLogMessage << "**************************************************" << std::endl;
 
   TrivialPrecon<LatticeFermion> TrivialPrecon;
-  auto MGPreconDw = createMGInstance<vSpinColourVector, vTComplex, nbasis, WilsonFermionR>(mgParams, levelInfo, Dw, Dw);
+#if defined (USE_TWOSPIN_COARSENING)
+  auto MGPreconDw = createMGInstance<vSpinColourVector,  vComplex, nbasis / 2, WilsonFermionR>(mgParams, levelInfo, Dw, Dw);
+#elif defined(USE_ONESPIN_COARSENING)
+  auto MGPreconDw = createMGInstance<vSpinColourVector,  vComplex, nbasis,     WilsonFermionR>(mgParams, levelInfo, Dw, Dw);
+#else // corresponds to original coarsening
+  auto MGPreconDw = createMGInstance<vSpinColourVector, vTComplex, nbasis,     WilsonFermionR>(mgParams, levelInfo, Dw, Dw);
+#endif
 
   MGPreconDw->setup();
 

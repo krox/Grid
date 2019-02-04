@@ -158,6 +158,25 @@ public:
   /////////////////////////////////////////////
 
   // clang-format off
+#if defined(USE_TWOSPIN_COARSENING)
+  typedef TwoSpinCoarseningPolicy<Lattice<Fobj>, CComplex, nBasis>                                           CoarseningPolicy;
+  typedef AggregationUsingPolicies<CoarseningPolicy>                                                         Aggregates;
+  typedef CoarsenedMatrixUsingPolicies<CoarseningPolicy>                                                     CoarseDiracMatrix;
+  typedef typename CoarseDiracMatrix::FermionField                                                           CoarseVector;
+  typedef typename CoarseDiracMatrix::SiteSpinor                                                             CoarseSiteVector;
+  typedef Matrix                                                                                             FineDiracMatrix;
+  typedef typename CoarseDiracMatrix::FineFermionField                                                       FineVector;
+  typedef MultiGridPreconditioner<CoarseSiteVector, CComplex, nBasis, nCoarserLevels - 1, CoarseDiracMatrix> NextPreconditionerLevel;
+#elif defined (USE_ONESPIN_COARSENING)
+  typedef OriginalCoarseningPolicy<Lattice<Fobj>, CComplex, nBasis>                                                   CoarseningPolicy;
+  typedef AggregationUsingPolicies<CoarseningPolicy>                                                                  Aggregates;
+  typedef CoarsenedMatrixUsingPolicies<CoarseningPolicy>                                                              CoarseDiracMatrix;
+  typedef typename CoarseDiracMatrix::FermionField                                                                    CoarseVector;
+  typedef typename CoarseDiracMatrix::SiteSpinor                                                                      CoarseSiteVector;
+  typedef Matrix                                                                                                      FineDiracMatrix;
+  typedef typename CoarseDiracMatrix::FineFermionField                                                                FineVector;
+  typedef MultiGridPreconditioner<CoarseSiteVector, iScalar<CComplex>, nBasis, nCoarserLevels - 1, CoarseDiracMatrix> NextPreconditionerLevel;
+#else
   typedef Aggregation<Fobj, CComplex, nBasis>                                                                         Aggregates;
   typedef CoarsenedMatrix<Fobj, CComplex, nBasis>                                                                     CoarseDiracMatrix;
   typedef typename Aggregates::CoarseVector                                                                           CoarseVector;
@@ -165,6 +184,7 @@ public:
   typedef Matrix                                                                                                      FineDiracMatrix;
   typedef typename Aggregates::FineField                                                                              FineVector;
   typedef MultiGridPreconditioner<CoarseSiteVector, iScalar<CComplex>, nBasis, nCoarserLevels - 1, CoarseDiracMatrix> NextPreconditionerLevel;
+  #endif
   // clang-format on
 
   /////////////////////////////////////////////
@@ -219,8 +239,12 @@ public:
 
     _SetupTotalTimer.Start();
 
+#if defined(USE_TWOSPIN_COARSENING)
+    int nb = nBasis;
+#else
     static_assert((nBasis & 0x1) == 0, "MG Preconditioner only supports an even number of basis vectors");
     int nb = nBasis / 2;
+#endif
 
     MdagMLinearOperator<FineDiracMatrix, FineVector> fineMdagMOp(_FineMatrix);
 
