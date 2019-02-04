@@ -229,17 +229,7 @@ public:
     _SetupCreateSubspaceTimer.Stop();
 
     _SetupProjectToChiralitiesTimer.Start();
-    FineVector tmp1(_Aggregates.Subspace()[0]._grid);
-    FineVector tmp2(_Aggregates.Subspace()[0]._grid);
-    for(int n = 0; n < nb; n++) {
-      auto tmp1 = _Aggregates.Subspace()[n];
-      G5C(tmp2, _Aggregates.Subspace()[n]);
-      axpby(_Aggregates.Subspace()[n], 0.5, 0.5, tmp1, tmp2);
-      axpby(_Aggregates.Subspace()[n + nb], 0.5, -0.5, tmp1, tmp2);
-      std::cout << GridLogMGrid(_CurrentLevel) << "Chirally doubled vector " << n << ". "
-                << "norm2(vec[" << n << "]) = " << norm2(_Aggregates.Subspace()[n]) << ". "
-                << "norm2(vec[" << n + nb << "]) = " << norm2(_Aggregates.Subspace()[n + nb]) << std::endl;
-    }
+    _Aggregates.DoChiralDoubling();
     _SetupProjectToChiralitiesTimer.Stop();
 
     _SetupCoarsenOperatorTimer.Start();

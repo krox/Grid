@@ -209,6 +209,22 @@ namespace Grid {
       SiteScalar tmp; tmp = 1.0;
       Vec(i) = tmp;
     }
+
+    void chiralDoublingKernel(std::vector<FineFermionField> & BasisVecs) {
+      assert(BasisVecs.size() % 2 == 0);
+      auto nb = BasisVecs.size() / 2;
+
+      for(int n = 0; n < nb; n++) {
+        auto tmp1 = BasisVecs[n];
+        auto tmp2 = tmp1;
+        G5C(tmp2, BasisVecs[n]);
+        axpby(BasisVecs[n], 0.5, 0.5, tmp1, tmp2);
+        axpby(BasisVecs[n + nb], 0.5, -0.5, tmp1, tmp2);
+        std::cout << GridLogMessage << "Chirally doubled vector " << n << ". "
+                  << "norm2(vec[" << n << "]) = " << norm2(BasisVecs[n]) << ". "
+                  << "norm2(vec[" << n + nb << "]) = " << norm2(BasisVecs[n + nb]) << std::endl;
+      }
+    }
   };
 
 
@@ -334,6 +350,10 @@ namespace Grid {
     strong_inline void setToOneKernel(SiteSpinor &Vec, int i) {
       for(int s = 0; s < Ncs; s++)
         Vec()(s)(i) = Simd(1.0);
+    }
+
+    void chiralDoublingKernel(std::vector<FineFermionField> &BasisVecs) {
+      std::cout << GridLogMessage << "Chiral doubling not necessary with twoSpinCoarseningPolicy" << std::endl;
     }
   };
 
@@ -509,6 +529,10 @@ namespace Grid {
       }
 
       Orthogonalise();
+    }
+
+    void DoChiralDoubling() {
+      CoarseningPolicy::chiralDoublingKernel(_subspace);
     }
   };
 
@@ -1201,6 +1225,22 @@ namespace Grid {
 
       Orthogonalise();
 
+    }
+
+    void DoChiralDoubling() {
+      assert(subspace.size() % 2 == 0);
+      auto nb = subspace.size() / 2;
+
+      for(int n = 0; n < nb; n++) {
+        auto tmp1 = subspace[n];
+        auto tmp2 = tmp1;
+        G5C(tmp2, subspace[n]);
+        axpby(subspace[n], 0.5, 0.5, tmp1, tmp2);
+        axpby(subspace[n + nb], 0.5, -0.5, tmp1, tmp2);
+        std::cout << GridLogMessage << "Chirally doubled vector " << n << ". "
+                  << "norm2(vec[" << n << "]) = " << norm2(subspace[n]) << ". "
+                  << "norm2(vec[" << n + nb << "]) = " << norm2(subspace[n + nb]) << std::endl;
+      }
     }
   };
   // Fine Object == (per site) type of fine field
