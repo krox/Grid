@@ -28,6 +28,8 @@
 #ifndef GRID_TEST_MULTIGRID_COMMON_H
 #define GRID_TEST_MULTIGRID_COMMON_H
 
+#define GridLogMGrid(level) GridLogMG << "Level " << level << ": "
+
 namespace Grid {
 
 // TODO: Can think about having one parameter struct per level and then a
@@ -234,7 +236,7 @@ public:
       G5C(tmp2, _Aggregates.Subspace()[n]);
       axpby(_Aggregates.Subspace()[n], 0.5, 0.5, tmp1, tmp2);
       axpby(_Aggregates.Subspace()[n + nb], 0.5, -0.5, tmp1, tmp2);
-      std::cout << GridLogMG << " Level " << _CurrentLevel << ": Chirally doubled vector " << n << ". "
+      std::cout << GridLogMGrid(_CurrentLevel) << "Chirally doubled vector " << n << ". "
                 << "norm2(vec[" << n << "]) = " << norm2(_Aggregates.Subspace()[n]) << ". "
                 << "norm2(vec[" << n + nb << "]) = " << norm2(_Aggregates.Subspace()[n + nb]) << std::endl;
     }
@@ -313,7 +315,7 @@ public:
     r                              = norm2(fineTmp);
     auto residualAfterPostSmoother = std::sqrt(r / inputNorm);
 
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": V-cycle: Input norm = " << std::sqrt(inputNorm)
+    std::cout << GridLogMGrid(_CurrentLevel) << "V-cycle: Input norm = " << std::sqrt(inputNorm)
               << " Coarse residual = " << residualAfterCoarseGridCorrection << " Post-Smoother residual = " << residualAfterPostSmoother
               << std::endl;
 
@@ -377,7 +379,7 @@ public:
     r                              = norm2(fineTmp);
     auto residualAfterPostSmoother = std::sqrt(r / inputNorm);
 
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": K-cycle: Input norm = " << std::sqrt(inputNorm)
+    std::cout << GridLogMGrid(_CurrentLevel) << "K-cycle: Input norm = " << std::sqrt(inputNorm)
               << " Coarse residual = " << residualAfterCoarseGridCorrection << " Post-Smoother residual = " << residualAfterPostSmoother
               << std::endl;
 
@@ -392,9 +394,9 @@ public:
     MdagMLinearOperator<FineDiracMatrix, FineVector>     fineMdagMOp(_FineMatrix);
     MdagMLinearOperator<CoarseDiracMatrix, CoarseVector> coarseMdagMOp(_CoarseMatrix);
 
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": **************************************************" << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": MG correctness check: 0 == (M - (Mdiag + Σ_μ Mdir_μ)) * v" << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": **************************************************" << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "**************************************************" << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "MG correctness check: 0 == (M - (Mdiag + Σ_μ Mdir_μ)) * v" << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "**************************************************" << std::endl;
 
     random(_LevelInfo.PRNGs[_CurrentLevel], fineTmps[0]);
 
@@ -414,11 +416,11 @@ public:
     fineTmps[6]    = fineTmps[1] - fineTmps[5];
     auto deviation = std::sqrt(norm2(fineTmps[6]) / norm2(fineTmps[1]));
 
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": norm2(M * v)                    = " << norm2(fineTmps[1]) << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": norm2(Mdiag * v)                = " << norm2(fineTmps[2]) << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": norm2(Σ_μ Mdir_μ * v)           = " << norm2(fineTmps[4]) << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": norm2((Mdiag + Σ_μ Mdir_μ) * v) = " << norm2(fineTmps[5]) << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": relative deviation              = " << deviation;
+    std::cout << GridLogMGrid(_CurrentLevel) << "norm2(M * v)                    = " << norm2(fineTmps[1]) << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "norm2(Mdiag * v)                = " << norm2(fineTmps[2]) << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "norm2(Σ_μ Mdir_μ * v)           = " << norm2(fineTmps[4]) << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "norm2((Mdiag + Σ_μ Mdir_μ) * v) = " << norm2(fineTmps[5]) << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "relative deviation              = " << deviation;
 
     if(deviation > tolerance) {
       std::cout << " > " << tolerance << " -> check failed" << std::endl;
@@ -427,9 +429,9 @@ public:
       std::cout << " < " << tolerance << " -> check passed" << std::endl;
     }
 
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": **************************************************" << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": MG correctness check: 0 == (1 - P R) v" << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": **************************************************" << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "**************************************************" << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "MG correctness check: 0 == (1 - P R) v" << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "**************************************************" << std::endl;
 
     for(auto i = 0; i < _Aggregates.Subspace().size(); ++i) {
       _Aggregates.ProjectToSubspace(coarseTmps[0], _Aggregates.Subspace()[i]); //   R v_i
@@ -438,7 +440,7 @@ public:
       fineTmps[1] = _Aggregates.Subspace()[i] - fineTmps[0]; // v_i - P R v_i
       deviation   = std::sqrt(norm2(fineTmps[1]) / norm2(_Aggregates.Subspace()[i]));
 
-      std::cout << GridLogMG << " Level " << _CurrentLevel << ": Vector " << i << ": norm2(v_i) = " << norm2(_Aggregates.Subspace()[i])
+      std::cout << GridLogMGrid(_CurrentLevel) << "Vector " << i << ": norm2(v_i) = " << norm2(_Aggregates.Subspace()[i])
                 << " | norm2(R v_i) = " << norm2(coarseTmps[0]) << " | norm2(P R v_i) = " << norm2(fineTmps[0])
                 << " | relative deviation = " << deviation;
 
@@ -450,9 +452,9 @@ public:
       }
     }
 
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": **************************************************" << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": MG correctness check: 0 == (1 - R P) v_c" << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": **************************************************" << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "**************************************************" << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "MG correctness check: 0 == (1 - R P) v_c" << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "**************************************************" << std::endl;
 
     random(_LevelInfo.PRNGs[_NextCoarserLevel], coarseTmps[0]);
 
@@ -462,7 +464,7 @@ public:
     coarseTmps[2] = coarseTmps[0] - coarseTmps[1]; // v_c - R P v_c
     deviation     = std::sqrt(norm2(coarseTmps[2]) / norm2(coarseTmps[0]));
 
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": norm2(v_c) = " << norm2(coarseTmps[0])
+    std::cout << GridLogMGrid(_CurrentLevel) << "norm2(v_c) = " << norm2(coarseTmps[0])
               << " | norm2(R P v_c) = " << norm2(coarseTmps[1]) << " | norm2(P v_c) = " << norm2(fineTmps[0])
               << " | relative deviation = " << deviation;
 
@@ -473,9 +475,9 @@ public:
       std::cout << " < " << tolerance << " -> check passed" << std::endl;
     }
 
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": **************************************************" << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": MG correctness check: 0 == (R D P - D_c) v_c" << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": **************************************************" << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "**************************************************" << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "MG correctness check: 0 == (R D P - D_c) v_c" << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "**************************************************" << std::endl;
 
     random(_LevelInfo.PRNGs[_NextCoarserLevel], coarseTmps[0]);
 
@@ -488,7 +490,7 @@ public:
     coarseTmps[3] = coarseTmps[1] - coarseTmps[2]; // R D P v_c - D_c v_c
     deviation     = std::sqrt(norm2(coarseTmps[3]) / norm2(coarseTmps[1]));
 
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": norm2(R D P v_c) = " << norm2(coarseTmps[1])
+    std::cout << GridLogMGrid(_CurrentLevel) << "norm2(R D P v_c) = " << norm2(coarseTmps[1])
               << " | norm2(D_c v_c) = " << norm2(coarseTmps[2]) << " | relative deviation = " << deviation;
 
     if(deviation > tolerance) {
@@ -498,9 +500,9 @@ public:
       std::cout << " < " << tolerance << " -> check passed" << std::endl;
     }
 
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": **************************************************" << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": MG correctness check: 0 == |(Im(v_c^dag D_c^dag D_c v_c)|" << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": **************************************************" << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "**************************************************" << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "MG correctness check: 0 == |(Im(v_c^dag D_c^dag D_c v_c)|" << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "**************************************************" << std::endl;
 
     random(_LevelInfo.PRNGs[_NextCoarserLevel], coarseTmps[0]);
 
@@ -510,7 +512,7 @@ public:
     auto dot  = innerProduct(coarseTmps[0], coarseTmps[2]); //v_c^dag D_c^dag D_c v_c
     deviation = std::abs(imag(dot)) / std::abs(real(dot));
 
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": Re(v_c^dag D_c^dag D_c v_c) = " << real(dot)
+    std::cout << GridLogMGrid(_CurrentLevel) << "Re(v_c^dag D_c^dag D_c v_c) = " << real(dot)
               << " | Im(v_c^dag D_c^dag D_c v_c) = " << imag(dot) << " | relative deviation = " << deviation;
 
     if(deviation > tolerance) {
@@ -526,17 +528,17 @@ public:
   void reportTimings() {
 
     // clang-format off
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": Time elapsed: Sum   total            " <<                _SetupTotalTimer.Elapsed() + _SolveTotalTimer.Elapsed() << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": Time elapsed: Setup total            " <<                _SetupTotalTimer.Elapsed() << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": Time elapsed: Setup create subspace  " <<       _SetupCreateSubspaceTimer.Elapsed() << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": Time elapsed: Setup project chiral   " << _SetupProjectToChiralitiesTimer.Elapsed() << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": Time elapsed: Setup coarsen operator " <<      _SetupCoarsenOperatorTimer.Elapsed() << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": Time elapsed: Setup next level       " <<            _SetupNextLevelTimer.Elapsed() << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": Time elapsed: Solve total            " <<                _SolveTotalTimer.Elapsed() << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": Time elapsed: Solve restriction      " <<          _SolveRestrictionTimer.Elapsed() << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": Time elapsed: Solve prolongation     " <<         _SolveProlongationTimer.Elapsed() << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": Time elapsed: Solve smoother         " <<             _SolveSmootherTimer.Elapsed() << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": Time elapsed: Solve next level       " <<            _SolveNextLevelTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Sum   total            " <<                _SetupTotalTimer.Elapsed() + _SolveTotalTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup total            " <<                _SetupTotalTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup create subspace  " <<       _SetupCreateSubspaceTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup project chiral   " << _SetupProjectToChiralitiesTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup coarsen operator " <<      _SetupCoarsenOperatorTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup next level       " <<            _SetupNextLevelTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve total            " <<                _SolveTotalTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve restriction      " <<          _SolveRestrictionTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve prolongation     " <<         _SolveProlongationTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve smoother         " <<             _SolveSmootherTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve next level       " <<            _SolveNextLevelTimer.Elapsed() << std::endl;
     // clang-format on
 
     _NextPreconditionerLevel->reportTimings();
@@ -629,8 +631,8 @@ public:
   void reportTimings() {
 
     // clang-format off
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": Time elapsed: Solve total            " <<    _SolveTotalTimer.Elapsed() << std::endl;
-    std::cout << GridLogMG << " Level " << _CurrentLevel << ": Time elapsed: Solve smoother         " << _SolveSmootherTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve total            " <<    _SolveTotalTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve smoother         " << _SolveSmootherTimer.Elapsed() << std::endl;
     // clang-format on
   }
 
