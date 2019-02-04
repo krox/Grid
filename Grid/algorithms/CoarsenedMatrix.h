@@ -475,6 +475,41 @@ namespace Grid {
       }
       // Orthogonalise();
     }
+
+    void CreateSubspace(GridParallelRNG &RNG, LinearOperatorBase<FineFermionField> &hermop, int nn = Nbasis) {
+
+      RealD scale;
+
+      ConjugateGradient<FineFermionField> CG(1.0e-2, 10000);
+      FineFermionField                    noise(_fineGrid);
+      FineFermionField                    Mn(_fineGrid);
+
+      for(int b = 0; b < nn; b++) {
+
+        _subspace[b] = zero;
+        gaussian(RNG, noise);
+        scale = std::pow(norm2(noise), -0.5);
+        noise = noise * scale;
+
+        hermop.Op(noise, Mn);
+        std::cout << GridLogMessage << "noise   [" << b << "] <n|MdagM|n> " << norm2(Mn) << std::endl;
+
+        for(int i = 0; i < 1; i++) {
+
+          CG(hermop, noise, _subspace[b]);
+
+          noise = _subspace[b];
+          scale = std::pow(norm2(noise), -0.5);
+          noise = noise * scale;
+        }
+
+        hermop.Op(noise, Mn);
+        std::cout << GridLogMessage << "filtered[" << b << "] <f|MdagM|f> " << norm2(Mn) << std::endl;
+        _subspace[b] = noise;
+      }
+
+      Orthogonalise();
+    }
   };
 
   template<class CoarseningPolicy>
