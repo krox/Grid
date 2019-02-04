@@ -37,7 +37,7 @@ using namespace Grid::BenchmarkHelpers;
 // NOTE to self: Copy the value of CXXFLAGS from the makefile and call make as follows:
 //   make CXXFLAGS="-DNBASIS=24 VALUE_OF_CXXFLAGS_IN_MAKEFILE" Benchmark_blocksum
 #ifndef NBASIS
-#define NBASIS 32
+#define NBASIS 40
 #endif
 
 int main(int argc, char **argv) {
