@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
 
   Aggregates Aggs(CGrid, FGrid, 0);
   Aggs.CreateSubspace(FPRNG, MdagMOp, nb);
-  performChiralDoubling(Aggs.subspace);
+  performChiralDoubling(Aggs.Subspace());
 
   LatticeFermion FineVec(FGrid);
   CoarseVector   CoarseVec(CGrid);
@@ -105,17 +105,17 @@ int main(int argc, char **argv) {
 
   CoarseningLookUpTable lookUpTable(CGrid, FGrid);
 
-  BenchmarkFunction(OriginalImpl::blockProject, flop, byte, nIter, CoarseVecOriginal, FineVec, Aggs.subspace);
-  BenchmarkFunction(blockProject,               flop, byte, nIter, CoarseVec,         FineVec, Aggs.subspace);
-  BenchmarkFunction(blockProject,               flop, byte, nIter, CoarseVecNew,      FineVec, Aggs.subspace, lookUpTable);
+  BenchmarkFunction(OriginalImpl::blockProject, flop, byte, nIter, CoarseVecOriginal, FineVec, Aggs.Subspace());
+  BenchmarkFunction(blockProject,               flop, byte, nIter, CoarseVec,         FineVec, Aggs.Subspace());
+  BenchmarkFunction(blockProject,               flop, byte, nIter, CoarseVecNew,      FineVec, Aggs.Subspace(), lookUpTable);
 
   printDeviationFromReference(CoarseVecOriginal, CoarseVec);
   printDeviationFromReference(CoarseVecOriginal, CoarseVecNew);
 
   if (doPerfProfiling) {
-    PerfProfileFunction(OriginalImpl::blockProject, nIter, CoarseVecOriginal, FineVec, Aggs.subspace);
-    PerfProfileFunction(blockProject,               nIter, CoarseVec,         FineVec, Aggs.subspace);
-    PerfProfileFunction(blockProject,               nIter, CoarseVecNew,      FineVec, Aggs.subspace, lookUpTable);
+    PerfProfileFunction(OriginalImpl::blockProject, nIter, CoarseVecOriginal, FineVec, Aggs.Subspace());
+    PerfProfileFunction(blockProject,               nIter, CoarseVec,         FineVec, Aggs.Subspace());
+    PerfProfileFunction(blockProject,               nIter, CoarseVecNew,      FineVec, Aggs.Subspace(), lookUpTable);
   }
 
   Grid_finalize();

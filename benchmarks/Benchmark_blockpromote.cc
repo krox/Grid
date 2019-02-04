@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
 
   Aggregates Aggs(CGrid, FGrid, 0);
   Aggs.CreateSubspace(FPRNG, MdagMOp, nb);
-  performChiralDoubling(Aggs.subspace);
+  performChiralDoubling(Aggs.Subspace());
 
   LatticeFermion FineVec(FGrid);
   CoarseVector   CoarseVec(CGrid);
@@ -98,10 +98,10 @@ int main(int argc, char **argv) {
   double flop = FVolume * (8 * (nBasis - 1) + 6) * FSiteElems;
   double byte = FVolume * ((1 * 1 + 3 * FSiteElems) * (nBasis - 1) + (1 * 1 + 2 * FSiteElems) * 1) * sizeof(Complex);
 
-  BenchmarkFunction(blockPromote, flop, byte, nIter, CoarseVec, FineVec, Aggs.subspace);
+  BenchmarkFunction(blockPromote, flop, byte, nIter, CoarseVec, FineVec, Aggs.Subspace());
 
   if (doPerfProfiling) {
-    PerfProfileFunction(blockPromote, nIter, CoarseVec, FineVec, Aggs.subspace);
+    PerfProfileFunction(blockPromote, nIter, CoarseVec, FineVec, Aggs.Subspace());
   }
 
   Grid_finalize();

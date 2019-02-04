@@ -212,11 +212,11 @@ int main(int argc, char **argv) {
   TwoSpinAggregation  twoSpinAggregates(CGrid, FGrid, 0);
 
   originalAggregates.CreateSubspaceRandom(FPRNG);
-  for(int i=0; i<twoSpinAggregates._subspace.size(); i++)
-    twoSpinAggregates._subspace[i] = originalAggregates.subspace[i];
-  performChiralDoubling(originalAggregates.subspace);
-  for(int i = 0; i < originalAggregates.subspace.size(); i++)
-    oneSpinAggregates._subspace[i] = originalAggregates.subspace[i];
+  for(int i=0; i<twoSpinAggregates.Subspace().size(); i++)
+    twoSpinAggregates.Subspace()[i] = originalAggregates.Subspace()[i];
+  performChiralDoubling(originalAggregates.Subspace());
+  for(int i = 0; i < originalAggregates.Subspace().size(); i++)
+    oneSpinAggregates.Subspace()[i] = originalAggregates.Subspace()[i];
 
   /////////////////////////////////////////////////////////////////////////////
   //                         Setup of CoarsenedMatrix                        //

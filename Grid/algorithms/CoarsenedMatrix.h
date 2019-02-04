@@ -369,6 +369,10 @@ namespace Grid {
       subdivides(_coarseGrid, _fineGrid);
     }
 
+    std::vector<FineFermionField> &Subspace() {
+      return _subspace;
+    }
+
     void Orthogonalise(void) {
       ScalarField InnerProd(_coarseGrid);
       std::cout << GridLogMessage << "Gram-Schmidt pass 1" << std::endl;
@@ -676,7 +680,7 @@ namespace Grid {
 
       for(int i = 0; i < Nbasis; i++) {
         PerfMonitors["Copy"].Start();
-        phi = Aggregates._subspace[i];
+        phi = Aggregates.Subspace()[i];
         PerfMonitors["Copy"].Stop();
 
         std::cout << GridLogMessage << "(" << i << ") .." << std::endl;
@@ -887,7 +891,7 @@ namespace Grid {
 
       for(int i = 0; i < Nbasis; i++) {
         PerfMonitors["Copy"].Start();
-        extractChiralComponents<isTwoSpinVersion>(phiSplit, Aggregates._subspace[i]);
+        extractChiralComponents<isTwoSpinVersion>(phiSplit, Aggregates.Subspace()[i]);
         PerfMonitors["Copy"].Stop();
 
         std::cout << GridLogMessage << "(" << i << ") .." << std::endl;
@@ -1035,6 +1039,10 @@ namespace Grid {
 	{
 	};
   
+    std::vector<FineField> &Subspace() {
+      return subspace;
+    }
+
     void Orthogonalise(void){
       CoarseScalar InnerProd(CoarseGrid); 
       std::cout << GridLogMessage <<" Gramm-Schmidt pass 1"<<std::endl;
@@ -1333,7 +1341,7 @@ namespace Grid {
 
       for(int i=0;i<nbasis;i++){
         PerfMonitors["Copy"].Start();
-	phi=Subspace.subspace[i];
+	phi=Subspace.Subspace()[i];
         PerfMonitors["Copy"].Stop();
 
 	std::cout<<GridLogMessage<<"("<<i<<").."<<std::endl;
@@ -1381,8 +1389,8 @@ namespace Grid {
           PerfMonitors["ProjectToSubspace"].Start();
 	  Subspace.ProjectToSubspace(iProj, iblock);
 	  Subspace.ProjectToSubspace(oProj,oblock);
-	  //	  blockProject(iProj,iblock,Subspace.subspace);
-	  //	  blockProject(oProj,oblock,Subspace.subspace);
+	  //	  blockProject(iProj,iblock,Subspace.Subspace());
+	  //	  blockProject(oProj,oblock,Subspace.Subspace());
           PerfMonitors["ProjectToSubspace"].Stop(2);
 
           PerfMonitors["ConstructLinks"].Start();
@@ -1414,12 +1422,12 @@ namespace Grid {
       }
       std::cout<<GridLogMessage<< " picking by block0 "<< self_stencil <<std::endl;
 
-      phi=Subspace.subspace[0];
+      phi=Subspace.Subspace()[0];
       std::vector<int> bc(FineGrid->_ndimension,0);
 
       blockPick(Grid(),phi,tmp,bc);      // Pick out a block
       linop.Op(tmp,Mphi);                // Apply big dop
-      OriginalImpl::blockProject(iProj,Mphi,Subspace.subspace); // project it and print it
+      OriginalImpl::blockProject(iProj,Mphi,Subspace.Subspace()); // project it and print it
       std::cout<<GridLogMessage<< " Computed matrix elements from block zero only "<<std::endl;
       std::cout<<GridLogMessage<< iProj <<std::endl;
       std::cout<<GridLogMessage<<"Computed Coarse Operator"<<std::endl;

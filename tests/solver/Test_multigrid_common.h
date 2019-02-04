@@ -227,16 +227,16 @@ public:
     _SetupCreateSubspaceTimer.Stop();
 
     _SetupProjectToChiralitiesTimer.Start();
-    FineVector tmp1(_Aggregates.subspace[0]._grid);
-    FineVector tmp2(_Aggregates.subspace[0]._grid);
+    FineVector tmp1(_Aggregates.Subspace()[0]._grid);
+    FineVector tmp2(_Aggregates.Subspace()[0]._grid);
     for(int n = 0; n < nb; n++) {
-      auto tmp1 = _Aggregates.subspace[n];
-      G5C(tmp2, _Aggregates.subspace[n]);
-      axpby(_Aggregates.subspace[n], 0.5, 0.5, tmp1, tmp2);
-      axpby(_Aggregates.subspace[n + nb], 0.5, -0.5, tmp1, tmp2);
+      auto tmp1 = _Aggregates.Subspace()[n];
+      G5C(tmp2, _Aggregates.Subspace()[n]);
+      axpby(_Aggregates.Subspace()[n], 0.5, 0.5, tmp1, tmp2);
+      axpby(_Aggregates.Subspace()[n + nb], 0.5, -0.5, tmp1, tmp2);
       std::cout << GridLogMG << " Level " << _CurrentLevel << ": Chirally doubled vector " << n << ". "
-                << "norm2(vec[" << n << "]) = " << norm2(_Aggregates.subspace[n]) << ". "
-                << "norm2(vec[" << n + nb << "]) = " << norm2(_Aggregates.subspace[n + nb]) << std::endl;
+                << "norm2(vec[" << n << "]) = " << norm2(_Aggregates.Subspace()[n]) << ". "
+                << "norm2(vec[" << n + nb << "]) = " << norm2(_Aggregates.Subspace()[n + nb]) << std::endl;
     }
     _SetupProjectToChiralitiesTimer.Stop();
 
@@ -431,14 +431,14 @@ public:
     std::cout << GridLogMG << " Level " << _CurrentLevel << ": MG correctness check: 0 == (1 - P R) v" << std::endl;
     std::cout << GridLogMG << " Level " << _CurrentLevel << ": **************************************************" << std::endl;
 
-    for(auto i = 0; i < _Aggregates.subspace.size(); ++i) {
-      _Aggregates.ProjectToSubspace(coarseTmps[0], _Aggregates.subspace[i]); //   R v_i
-      _Aggregates.PromoteFromSubspace(coarseTmps[0], fineTmps[0]);           // P R v_i
+    for(auto i = 0; i < _Aggregates.Subspace().size(); ++i) {
+      _Aggregates.ProjectToSubspace(coarseTmps[0], _Aggregates.Subspace()[i]); //   R v_i
+      _Aggregates.PromoteFromSubspace(coarseTmps[0], fineTmps[0]);             // P R v_i
 
-      fineTmps[1] = _Aggregates.subspace[i] - fineTmps[0]; // v_i - P R v_i
-      deviation   = std::sqrt(norm2(fineTmps[1]) / norm2(_Aggregates.subspace[i]));
+      fineTmps[1] = _Aggregates.Subspace()[i] - fineTmps[0]; // v_i - P R v_i
+      deviation   = std::sqrt(norm2(fineTmps[1]) / norm2(_Aggregates.Subspace()[i]));
 
-      std::cout << GridLogMG << " Level " << _CurrentLevel << ": Vector " << i << ": norm2(v_i) = " << norm2(_Aggregates.subspace[i])
+      std::cout << GridLogMG << " Level " << _CurrentLevel << ": Vector " << i << ": norm2(v_i) = " << norm2(_Aggregates.Subspace()[i])
                 << " | norm2(R v_i) = " << norm2(coarseTmps[0]) << " | norm2(P R v_i) = " << norm2(fineTmps[0])
                 << " | relative deviation = " << deviation;
 

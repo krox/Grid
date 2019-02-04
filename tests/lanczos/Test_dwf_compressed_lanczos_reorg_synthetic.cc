@@ -137,18 +137,18 @@ public:
   void testFine(void)
   {
     int Nk = nbasis;
-    _Aggregate.subspace.resize(Nk,_FineGrid);
-    _Aggregate.subspace[0]=1.0;
-    _Aggregate.subspace[0].checkerboard=_checkerboard;
-    normalise(_Aggregate.subspace[0]);
+    _Aggregate.Subspace().resize(Nk,_FineGrid);
+    _Aggregate.Subspace()[0]=1.0;
+    _Aggregate.Subspace()[0].checkerboard=_checkerboard;
+    normalise(_Aggregate.Subspace()[0]);
     PlainHermOp<FineField>    Op(_FineOp);
     for(int k=1;k<Nk;k++){
-      Op(_Aggregate.subspace[k-1],_Aggregate.subspace[k]);
-      normalise(_Aggregate.subspace[k]);
-      std::cout << GridLogMessage << "testFine subspace "<<k<<" " <<norm2(_Aggregate.subspace[k])<<std::endl;
+      Op(_Aggregate.Subspace()[k-1],_Aggregate.Subspace()[k]);
+      normalise(_Aggregate.Subspace()[k]);
+      std::cout << GridLogMessage << "testFine subspace "<<k<<" " <<norm2(_Aggregate.Subspace()[k])<<std::endl;
     }
     for(int k=0;k<Nk;k++){
-      std::cout << GridLogMessage << "testFine subspace "<<k<<"  cb " <<_Aggregate.subspace[k].checkerboard<<std::endl;
+      std::cout << GridLogMessage << "testFine subspace "<<k<<"  cb " <<_Aggregate.Subspace()[k].checkerboard<<std::endl;
     }
     _Aggregate.Orthogonalise();
   }
@@ -168,11 +168,11 @@ public:
     FineField src(_FineGrid); src=1.0; src.checkerboard = _checkerboard;
 
     ImplicitlyRestartedLanczos<FineField> IRL(ChebyOp,Op,Nk,Nk,Nm,resid,MaxIt,betastp,MinRes);
-    _Aggregate.subspace.resize(Nm,_FineGrid);
-    IRL.calc(eval,_Aggregate.subspace,src,Nk,false);
-    _Aggregate.subspace.resize(Nk,_FineGrid);
+    _Aggregate.Subspace().resize(Nm,_FineGrid);
+    IRL.calc(eval,_Aggregate.Subspace(),src,Nk,false);
+    _Aggregate.Subspace().resize(Nk,_FineGrid);
     for(int k=0;k<Nk;k++){
-      std::cout << GridLogMessage << "testFine subspace "<<k<<"  cb " <<_Aggregate.subspace[k].checkerboard<<std::endl;
+      std::cout << GridLogMessage << "testFine subspace "<<k<<"  cb " <<_Aggregate.Subspace()[k].checkerboard<<std::endl;
     }
     _Aggregate.Orthogonalise();
   }
