@@ -478,7 +478,8 @@ namespace Grid {
   };
 
   template<class CoarseningPolicy>
-  class CoarsenedMatrixUsingPolicies : SparseMatrixBase<typename CoarseningPolicy::FermionField>, public CoarseningPolicy {
+  class CoarsenedMatrixUsingPolicies : public SparseMatrixBase<typename CoarseningPolicy::FermionField>
+                                     , public CoarseningPolicy {
   public:
 
     /////////////////////////////////////////////
