@@ -493,7 +493,7 @@ namespace Grid {
         random(RNG, _subspace[i]);
         std::cout << GridLogMessage << " norm subspace[" << i << "] " << norm2(_subspace[i]) << std::endl;
       }
-      // Orthogonalise();
+      Orthogonalise();
     }
 
     void CreateSubspace(GridParallelRNG &RNG, LinearOperatorBase<FineFermionField> &hermop, int nn = Nbasis) {
@@ -1138,7 +1138,7 @@ namespace Grid {
 	random(RNG,subspace[i]);
 	std::cout<<GridLogMessage<<" norm subspace["<<i<<"] "<<norm2(subspace[i])<<std::endl;
       }
-      // Orthogonalise();
+      Orthogonalise();
     }
 
     /*
