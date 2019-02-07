@@ -531,6 +531,48 @@ namespace Grid {
       Orthogonalise();
     }
 
+    void CreateSubspaceDDalphaAMG(GridParallelRNG &RNG, LinearOperatorBase<FineFermionField> &linop, int nn = Nbasis, Integer restartLength = 20) {
+      RealD            scale;
+      FineFermionField tmp(_fineGrid);
+      FineFermionField Mphi(_fineGrid);
+
+      // TODO: We shouldn't fix this to GMRES here but accept a general smooter as argument
+      GeneralisedMinimalResidual<FineFermionField> GMRES(1.0e-14, restartLength, restartLength, false);
+
+      for(int b = 0; b < nn; b++) {
+        gaussian(RNG, _subspace[b]);
+
+        linop.Op(_subspace[b], Mphi);
+        auto normRandom = norm2(Mphi);
+
+        // NOTE: This is the version MR actually proposes in his PHD thesis
+        // tmp = zero;
+        // for(int i = 0; i < 3; i++) {
+        //   GMRES(linop, _subspace[b], tmp);
+        // }
+        // scale        = std::pow(norm2(tmp), -0.5);
+        // _subspace[b] = tmp * scale;
+
+        // NOTE: This is the version I see better results with
+        for(int i = 0; i < 3; i++) {
+          tmp = zero;
+          GMRES(linop, _subspace[b], tmp);
+          _subspace[b] = tmp;
+        }
+        scale        = std::pow(norm2(_subspace[b]), -0.5);
+        _subspace[b] = _subspace[b] * scale;
+
+        linop.Op(_subspace[b], Mphi);
+        auto normFiltered = norm2(Mphi);
+        std::cout << GridLogMessage             << "Vector [" << b << "]:"
+                  << " <n|MdagM|n> random = "   << normRandom
+                  << " <n|MdagM|n> filtered = " << normFiltered
+                  << " reduction = "            << normFiltered / normRandom
+                  << std::endl;
+      }
+      Orthogonalise();
+    }
+
     void DoChiralDoubling() {
       CoarseningPolicy::chiralDoublingKernel(_subspace);
     }
@@ -1225,6 +1267,48 @@ namespace Grid {
 
       Orthogonalise();
 
+    }
+
+    virtual void CreateSubspaceDDalphaAMG(GridParallelRNG &RNG, LinearOperatorBase<FineField> &linop, int nn = nbasis, Integer restartLength = 20) {
+      RealD     scale;
+      FineField tmp(FineGrid);
+      FineField Mphi(FineGrid);
+
+      // TODO: We shouldn't fix this to GMRES here but accept a general smooter as argument
+      GeneralisedMinimalResidual<FineField> GMRES(1.0e-14, restartLength, restartLength, false);
+
+      for(int b = 0; b < nn; b++) {
+        gaussian(RNG, subspace[b]);
+
+        linop.Op(subspace[b], Mphi);
+        auto normRandom = norm2(Mphi);
+
+        // NOTE: This is the version MR actually proposes in his PHD thesis
+        // tmp = zero;
+        // for(int i = 0; i < 3; i++) {
+        //   GMRES(linop, subspace[b], tmp);
+        // }
+        // scale       = std::pow(norm2(tmp), -0.5);
+        // subspace[b] = tmp * scale;
+
+        // NOTE: This is the version I see better results with
+        for(int i = 0; i < 3; i++) {
+          tmp = zero;
+          GMRES(linop, subspace[b], tmp);
+          subspace[b] = tmp;
+        }
+        scale       = std::pow(norm2(subspace[b]), -0.5);
+        subspace[b] = subspace[b] * scale;
+
+        linop.Op(subspace[b], Mphi);
+        auto normFiltered = norm2(Mphi);
+        std::cout << GridLogMessage             << "Vector [" << b << "]:"
+                  << " <n|MdagM|n> random = "   << normRandom
+                  << " <n|MdagM|n> filtered = " << normFiltered
+                  << " reduction = "            << normFiltered / normRandom
+                  << std::endl;
+      }
+      Orthogonalise();
     }
 
     void DoChiralDoubling() {

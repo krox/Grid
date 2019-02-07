@@ -249,7 +249,7 @@ public:
     MdagMLinearOperator<FineDiracMatrix, FineVector> fineMdagMOp(_FineMatrix);
 
     _SetupCreateSubspaceTimer.Start();
-    _Aggregates.CreateSubspace(_LevelInfo.PRNGs[_CurrentLevel], fineMdagMOp, nb);
+    _Aggregates.CreateSubspaceDDalphaAMG(_LevelInfo.PRNGs[_CurrentLevel], fineMdagMOp, nb, _MultiGridParams.smootherMaxInnerIter[_CurrentLevel]);
     _SetupCreateSubspaceTimer.Stop();
 
     _SetupProjectToChiralitiesTimer.Start();
