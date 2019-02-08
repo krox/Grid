@@ -47,81 +47,107 @@ int main(int argc, char **argv) {
   GridCartesian *        FGrid   = SpaceTimeGrid::makeFourDimGrid(GridDefaultLatt(), GridDefaultSimd(Nd, vComplex::Nsimd()), GridDefaultMpi());
   GridRedBlackCartesian *FrbGrid = SpaceTimeGrid::makeFourDimRedBlackGrid(FGrid);
 
-  std::vector<int> fSeeds({1, 2, 3, 4});
-  GridParallelRNG  fPRNG(FGrid);
-  fPRNG.SeedFixedIntegers(fSeeds);
-
-  // clang-format off
-  LatticeFermion    src(FGrid); gaussian(fPRNG, src);
-  LatticeFermion result(FGrid); result = zero;
-  LatticeGaugeField Umu(FGrid); SU3::HotConfiguration(fPRNG, Umu);
-  // clang-format on
-
-  RealD mass = -0.25;
-
-  MultiGridParams mgParams;
-  std::string     inputXml{"./mg_params.xml"};
+  MGTestParams params;
 
   if(GridCmdOptionExists(argv, argv + argc, "--inputxml")) {
-    inputXml = GridCmdOptionPayload(argv, argv + argc, "--inputxml");
+    std::string inputXml = GridCmdOptionPayload(argv, argv + argc, "--inputxml");
     assert(inputXml.length() != 0);
-  }
-
-  {
-    XmlWriter writer("mg_params_template.xml");
-    write(writer, "Params", mgParams);
-    std::cout << GridLogMessage << "Written mg_params_template.xml" << std::endl;
 
     XmlReader reader(inputXml);
-    read(reader, "Params", mgParams);
+    read(reader, "Params", params);
     std::cout << GridLogMessage << "Read in " << inputXml << std::endl;
   }
 
-  checkParameterValidity(mgParams);
-  std::cout << mgParams << std::endl;
+  // {
+  //   XmlWriter writer("mg_params_template.xml");
+  //   write(writer, "Params", params);
+  //   std::cout << GridLogMessage << "Written mg_params_template.xml" << std::endl;
+  // }
 
-  LevelInfo levelInfo(FGrid, mgParams);
+  checkParameterValidity(params);
+  std::cout << params << std::endl;
 
-  // Note: We do chiral doubling, so actually only nbasis/2 full basis vectors are used
+  LevelInfo levelInfo(FGrid, params.mg);
+
   const int nbasis = NBASIS;
 #if !defined(USE_TWOSPIN_COARSENING)
   static_assert((nbasis & 0x1) == 0, "");
 #endif
 
-  WilsonFermionR Dw(Umu, *FGrid, *FrbGrid, mass);
+  std::vector<int> fSeeds({1, 2, 3, 4});
+  GridParallelRNG  fPRNG(FGrid);
+  fPRNG.SeedFixedIntegers(fSeeds);
+
+  LatticeFermion    src(FGrid);
+  LatticeFermion    result(FGrid);
+  LatticeGaugeField Umu(FGrid);
+
+  if(params.test.sourceType == "ones")
+    src = 1.;
+  else if(params.test.sourceType == "random")
+    random(fPRNG, src);
+  else if(params.test.sourceType == "gaussian")
+    gaussian(fPRNG, src);
+
+  if(params.test.config != "foo") {
+    FieldMetaData      header;
+    IldgReader         _IldgReader;
+    _IldgReader.open(params.test.config);
+    _IldgReader.readConfiguration(Umu, header);
+    _IldgReader.close();
+  } else
+    SU3::HotConfiguration(fPRNG, Umu);
+
+  typename WilsonFermionR::ImplParams implParams;
+  if(params.test.useAntiPeriodicBC)
+    implParams.boundary_phases = {+1, +1, +1, -1};
+  else
+    implParams.boundary_phases = {+1, +1, +1, +1};
+
+  WilsonFermionR Dw(Umu, *FGrid, *FrbGrid, params.test.mass, implParams);
 
   MdagMLinearOperator<WilsonFermionR, LatticeFermion> MdagMOpDw(Dw);
+
+  TrivialPrecon<LatticeFermion> TrivialPrecon;
 
   std::cout << GridLogMessage << "**************************************************" << std::endl;
   std::cout << GridLogMessage << "Testing Multigrid for Wilson" << std::endl;
   std::cout << GridLogMessage << "**************************************************" << std::endl;
 
-  TrivialPrecon<LatticeFermion> TrivialPrecon;
 #if defined (USE_TWOSPIN_COARSENING)
-  auto MGPreconDw = createMGInstance<vSpinColourVector,  vComplex, nbasis / 2, WilsonFermionR>(mgParams, levelInfo, Dw, Dw);
+  auto MGPreconDw = createMGInstance<vSpinColourVector,  vComplex, nbasis / 2, WilsonFermionR>(params.mg, levelInfo, Dw, Dw);
 #elif defined(USE_ONESPIN_COARSENING)
-  auto MGPreconDw = createMGInstance<vSpinColourVector,  vComplex, nbasis,     WilsonFermionR>(mgParams, levelInfo, Dw, Dw);
+  auto MGPreconDw = createMGInstance<vSpinColourVector,  vComplex, nbasis,     WilsonFermionR>(params.mg, levelInfo, Dw, Dw);
 #else // corresponds to original coarsening
-  auto MGPreconDw = createMGInstance<vSpinColourVector, vTComplex, nbasis,     WilsonFermionR>(mgParams, levelInfo, Dw, Dw);
+  auto MGPreconDw = createMGInstance<vSpinColourVector, vTComplex, nbasis,     WilsonFermionR>(params.mg, levelInfo, Dw, Dw);
 #endif
 
-  MGPreconDw->setup();
+  bool  doRunChecks          = (GridCmdOptionExists(argv, argv + argc, "--runchecks")) ? true : false;
+  RealD toleranceForMGChecks = (getPrecision<LatticeFermion>::value == 1) ? 1e-6 : 1e-13;
 
-  if(GridCmdOptionExists(argv, argv + argc, "--runchecks")) {
-    RealD toleranceForMGChecks = (getPrecision<LatticeFermion>::value == 1) ? 1e-6 : 1e-13;
-    MGPreconDw->runChecks(toleranceForMGChecks);
-  }
+  MGPreconDw->initialSetup();
+  if(doRunChecks) MGPreconDw->runChecks(toleranceForMGChecks);
+
+  MGPreconDw->iterativeSetup();
+  if(doRunChecks) MGPreconDw->runChecks(toleranceForMGChecks);
 
   std::vector<std::unique_ptr<OperatorFunction<LatticeFermion>>> solversDw;
 
-  solversDw.emplace_back(new ConjugateGradient<LatticeFermion>(1.0e-12, 50000, false));
-  solversDw.emplace_back(new FlexibleGeneralisedMinimalResidual<LatticeFermion>(1.0e-12, 50000, TrivialPrecon, 100, false));
-  solversDw.emplace_back(new FlexibleGeneralisedMinimalResidual<LatticeFermion>(1.0e-12, 50000, *MGPreconDw, 100, false));
+  auto outerSolverMaxIter = params.test.outerSolverMaxOuterIter * params.test.outerSolverMaxInnerIter;
 
+  solversDw.emplace_back(new ConjugateGradient<LatticeFermion>(params.test.outerSolverTol, 10000, false));
+  solversDw.emplace_back(new FlexibleGeneralisedMinimalResidual<LatticeFermion>(params.test.outerSolverTol, 10000, TrivialPrecon, params.test.outerSolverMaxInnerIter, false));
+  solversDw.emplace_back(new FlexibleGeneralisedMinimalResidual<LatticeFermion>(params.test.outerSolverTol, outerSolverMaxIter, *MGPreconDw, params.test.outerSolverMaxInnerIter, false));
+
+  GridStopWatch solveTimer;
   for(auto const &solver : solversDw) {
+    solveTimer.Reset();
     std::cout << std::endl << "Starting with a new solver" << std::endl;
     result = zero;
+    solveTimer.Start();
     (*solver)(MdagMOpDw, src, result);
+    solveTimer.Stop();
+    std::cout << GridLogMessage << "Solver took: " << solveTimer.Elapsed() << std::endl;
   }
 
   MGPreconDw->reportTimings();
