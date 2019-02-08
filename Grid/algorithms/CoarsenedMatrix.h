@@ -353,7 +353,7 @@ namespace Grid {
     }
 
     void chiralDoublingKernel(std::vector<FineFermionField> &BasisVecs) {
-      std::cout << GridLogMessage << "Chiral doubling not necessary with twoSpinCoarseningPolicy" << std::endl;
+      std::cout << GridLogMessage << "Skipping chiral doubling as it is not necessary with twoSpinCoarseningPolicy" << std::endl;
     }
   };
 
