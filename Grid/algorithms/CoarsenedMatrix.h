@@ -393,12 +393,12 @@ namespace Grid {
       return _subspace;
     }
 
-    void Orthogonalise(void) {
+    void Orthogonalise(int passes = 2) {
       ScalarField InnerProd(_coarseGrid);
-      std::cout << GridLogMessage << "Gram-Schmidt pass 1" << std::endl;
-      CoarseningPolicy::orthogonaliseKernel(InnerProd, _subspace);
-      std::cout << GridLogMessage << "Gram-Schmidt pass 2" << std::endl;
-      CoarseningPolicy::orthogonaliseKernel(InnerProd, _subspace);
+      for(int n = 0; n < passes; ++n) {
+        std::cout << GridLogMessage << "Gram-Schmidt pass " << n+1 << std::endl;
+        CoarseningPolicy::orthogonaliseKernel(InnerProd, _subspace);
+      }
       std::cout << GridLogMessage << "Gram-Schmidt checking orthogonality" << std::endl;
       CheckOrthogonal();
     }
@@ -694,7 +694,7 @@ namespace Grid {
 
       PerfMonitors["Orthogonalise"].Start();
       // Orthogonalise the subblocks over the basis
-      Aggregates.Orthogonalise();
+      Aggregates.Orthogonalise(1);
       PerfMonitors["Orthogonalise"].Stop();
 
       PerfMonitors["Misc"].Start();
@@ -906,7 +906,7 @@ namespace Grid {
 
       PerfMonitors["Orthogonalise"].Start();
       // // Orthogonalise the subblocks over the basis
-      Aggregates.Orthogonalise();
+      Aggregates.Orthogonalise(1);
       PerfMonitors["Orthogonalise"].Stop();
 
       PerfMonitors["Misc"].Start();
@@ -1103,13 +1103,13 @@ namespace Grid {
       return subspace;
     }
 
-    void Orthogonalise(void){
-      CoarseScalar InnerProd(CoarseGrid); 
-      std::cout << GridLogMessage <<" Gramm-Schmidt pass 1"<<std::endl;
-      OriginalImpl::blockOrthogonalise(InnerProd,subspace);
-      std::cout << GridLogMessage <<" Gramm-Schmidt pass 2"<<std::endl;
-      OriginalImpl::blockOrthogonalise(InnerProd,subspace);
-      std::cout << GridLogMessage <<" Gramm-Schmidt checking orthogonality"<<std::endl;
+    void Orthogonalise(int passes = 2){
+      CoarseScalar InnerProd(CoarseGrid);
+      for(int n = 0; n < passes; ++n) {
+        std::cout << GridLogMessage <<" Gramm-Schmidt pass " << n+1 << std::endl;
+        OriginalImpl::blockOrthogonalise(InnerProd, subspace);
+      }
+      std::cout << GridLogMessage <<" Gramm-Schmidt checking orthogonality" << std::endl;
       CheckOrthogonal();
     } 
     void CheckOrthogonal(void){
@@ -1399,7 +1399,7 @@ namespace Grid {
 
       PerfMonitors["Orthogonalise"].Start();
       // Orthogonalise the subblocks over the basis
-      Subspace.Orthogonalise();
+      Subspace.Orthogonalise(1);
       PerfMonitors["Orthogonalise"].Stop();
 
       PerfMonitors["Misc"].Start();
