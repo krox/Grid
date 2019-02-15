@@ -191,6 +191,13 @@ public:
   // Member Data
   /////////////////////////////////////////////
 
+#if defined(USE_TWOSPIN_COARSENING)
+    const int nB = nBasis;
+#else
+    static_assert((nBasis & 0x1) == 0, "MG Preconditioner only supports an even number of basis vectors");
+    const int nB = nBasis / 2;
+#endif
+
   int _CurrentLevel;
   int _NextCoarserLevel;
 
@@ -237,10 +244,6 @@ public:
     , _FineSrc(_LevelInfo.Grids[_CurrentLevel])
     , _FineSol(_LevelInfo.Grids[_CurrentLevel]) {
 
-#if !defined(USE_TWOSPIN_COARSENING)
-    static_assert((nBasis & 0x1) == 0, "MG Preconditioner only supports an even number of basis vectors");
-#endif
-
     _NextPreconditionerLevel
       = std::unique_ptr<NextPreconditionerLevel>(new NextPreconditionerLevel(_MultiGridParams, _LevelInfo, _CoarseMatrix, _CoarseMatrix));
 
@@ -251,14 +254,8 @@ public:
 
     _SetupTotalTimer.Start();
 
-#if defined(USE_TWOSPIN_COARSENING)
-    int nb = nBasis;
-#else
-    int nb = nBasis / 2;
-#endif
-
     _SetupCreateSubspaceTimer.Start();
-    _Aggregates.CreateSubspaceDDalphaAMG(_LevelInfo.PRNGs[_CurrentLevel], _FineMdagMOp, nb, _MultiGridParams.smootherMaxInnerIter[_CurrentLevel]);
+    _Aggregates.CreateSubspaceDDalphaAMG(_LevelInfo.PRNGs[_CurrentLevel], _FineMdagMOp, nB, _MultiGridParams.smootherMaxInnerIter[_CurrentLevel]);
     _SetupCreateSubspaceTimer.Stop();
 
     _SetupProjectToChiralitiesTimer.Start();
