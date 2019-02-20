@@ -210,6 +210,7 @@ public:
   CoarseDiracMatrix _CoarseMatrix;
 
   MdagMLinearOperator<FineDiracMatrix, FineVector> _FineMdagMOp;
+  MdagMLinearOperator<FineDiracMatrix, FineVector> _FineSmootherMdagMOp;
 
   FineVector _FineSrc;
   FineVector _FineSol;
@@ -242,6 +243,7 @@ public:
     , _Aggregates(_LevelInfo.Grids[_NextCoarserLevel], _LevelInfo.Grids[_CurrentLevel], 0)
     , _CoarseMatrix(*_LevelInfo.Grids[_NextCoarserLevel])
     , _FineMdagMOp(_FineMatrix)
+    , _FineSmootherMdagMOp(_SmootherMatrix)
     , _FineSrc(_LevelInfo.Grids[_CurrentLevel])
     , _FineSol(_LevelInfo.Grids[_CurrentLevel]) {
 
@@ -256,7 +258,7 @@ public:
     _SetupTotalTimer.Start();
 
     _SetupCreateSubspaceTimer.Start();
-    _Aggregates.CreateSubspaceDDalphaAMG(_LevelInfo.PRNGs[_CurrentLevel], _FineMdagMOp, nB, _MultiGridParams.smootherMaxInnerIter[_CurrentLevel]);
+    _Aggregates.CreateSubspaceDDalphaAMG(_LevelInfo.PRNGs[_CurrentLevel], _FineSmootherMdagMOp, nB, _MultiGridParams.smootherMaxInnerIter[_CurrentLevel]);
     _SetupCreateSubspaceTimer.Stop();
 
     _SetupProjectToChiralitiesTimer.Start();
@@ -305,8 +307,6 @@ public:
                                                               fineTrivialPreconditioner,
                                                               _MultiGridParams.smootherMaxInnerIter[_CurrentLevel],
                                                               false);
-
-    MdagMLinearOperator<FineDiracMatrix, FineVector> fineSmootherMdagMOp(_SmootherMatrix);
     _SolveMiscTimer.Stop();
 
     _SolveRestrictionTimer.Start();
@@ -329,7 +329,7 @@ public:
     _SolveMiscTimer.Stop();
 
     _SolveSmootherTimer.Start();
-    fineFGMRES(fineSmootherMdagMOp, in, out);
+    fineFGMRES(_FineSmootherMdagMOp, in, out);
     _SolveSmootherTimer.Stop();
 
     _SolveMiscTimer.Start();
@@ -373,15 +373,12 @@ public:
                                                                   false);
     _SolveMiscTimer.Stop();
 
-    MdagMLinearOperator<FineDiracMatrix, FineVector>     fineSmootherMdagMOp(_SmootherMatrix);
-    MdagMLinearOperator<CoarseDiracMatrix, CoarseVector> coarseMdagMOp(_CoarseMatrix);
-
     _SolveRestrictionTimer.Start();
     _Aggregates.ProjectToSubspace(_NextPreconditionerLevel->_FineSrc, in);
     _SolveRestrictionTimer.Stop();
 
     _SolveNextLevelTimer.Start();
-    coarseFGMRES(coarseMdagMOp, _NextPreconditionerLevel->_FineSrc, _NextPreconditionerLevel->_FineSol);
+    coarseFGMRES(_NextPreconditionerLevel->_FineMdagMOp, _NextPreconditionerLevel->_FineSrc, _NextPreconditionerLevel->_FineSol);
     _SolveNextLevelTimer.Stop();
 
     _SolveProlongationTimer.Start();
@@ -396,7 +393,7 @@ public:
     _SolveMiscTimer.Stop();
 
     _SolveSmootherTimer.Start();
-    fineFGMRES(fineSmootherMdagMOp, in, out);
+    fineFGMRES(_FineSmootherMdagMOp, in, out);
     _SolveSmootherTimer.Stop();
 
     _SolveMiscTimer.Start();
@@ -419,8 +416,6 @@ public:
 
     std::vector<FineVector>   fineTmps(7, _LevelInfo.Grids[_CurrentLevel]);
     std::vector<CoarseVector> coarseTmps(4, _LevelInfo.Grids[_NextCoarserLevel]);
-
-    MdagMLinearOperator<CoarseDiracMatrix, CoarseVector> coarseMdagMOp(_CoarseMatrix);
 
     std::cout << GridLogMGrid(_CurrentLevel) << "**************************************************" << std::endl;
     std::cout << GridLogMGrid(_CurrentLevel) << "MG correctness check: 0 == (M - (Mdiag + Σ_μ Mdir_μ)) * v" << std::endl;
@@ -513,7 +508,7 @@ public:
     _FineMdagMOp.Op(fineTmps[0], fineTmps[1]);                   //   D P v_c
     _Aggregates.ProjectToSubspace(coarseTmps[1], fineTmps[1]);   // R D P v_c
 
-    coarseMdagMOp.Op(coarseTmps[0], coarseTmps[2]); // D_c v_c
+    _NextPreconditionerLevel->_FineMdagMOp.Op(coarseTmps[0], coarseTmps[2]); // D_c v_c
 
     coarseTmps[3] = coarseTmps[1] - coarseTmps[2]; // R D P v_c - D_c v_c
     deviation     = std::sqrt(norm2(coarseTmps[3]) / norm2(coarseTmps[1]));
@@ -534,8 +529,8 @@ public:
 
     random(_LevelInfo.PRNGs[_NextCoarserLevel], coarseTmps[0]);
 
-    coarseMdagMOp.Op(coarseTmps[0], coarseTmps[1]);    //         D_c v_c
-    coarseMdagMOp.AdjOp(coarseTmps[1], coarseTmps[2]); // D_c^dag D_c v_c
+    _NextPreconditionerLevel->_FineMdagMOp.Op(coarseTmps[0], coarseTmps[1]);    //         D_c v_c
+    _NextPreconditionerLevel->_FineMdagMOp.AdjOp(coarseTmps[1], coarseTmps[2]); // D_c^dag D_c v_c
 
     auto dot  = innerProduct(coarseTmps[0], coarseTmps[2]); //v_c^dag D_c^dag D_c v_c
     deviation = std::abs(imag(dot)) / std::abs(real(dot));
@@ -615,6 +610,7 @@ public:
   FineDiracMatrix &_SmootherMatrix;
 
   MdagMLinearOperator<FineDiracMatrix, FineVector> _FineMdagMOp;
+  MdagMLinearOperator<FineDiracMatrix, FineVector> _FineSmootherMdagMOp;
 
   FineVector _FineSrc;
   FineVector _FineSol;
@@ -633,7 +629,8 @@ public:
     , _LevelInfo(LvlInfo)
     , _FineMatrix(FineMat)
     , _SmootherMatrix(SmootherMat)
-    , _FineMdagMOp(FineMat)
+    , _FineMdagMOp(_FineMatrix)
+    , _FineSmootherMdagMOp(_SmootherMatrix)
     , _FineSrc(_LevelInfo.Grids[_CurrentLevel])
     , _FineSol(_LevelInfo.Grids[_CurrentLevel]) {
 
