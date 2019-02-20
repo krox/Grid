@@ -159,14 +159,14 @@ public:
 
   // clang-format off
 #if defined(USE_TWOSPIN_COARSENING)
-  typedef TwoSpinCoarseningPolicy<Lattice<Fobj>, CComplex, nBasis>                                           CoarseningPolicy;
-  typedef AggregationUsingPolicies<CoarseningPolicy>                                                         Aggregates;
-  typedef CoarsenedMatrixUsingPolicies<CoarseningPolicy>                                                     CoarseDiracMatrix;
-  typedef typename CoarseDiracMatrix::FermionField                                                           CoarseVector;
-  typedef typename CoarseDiracMatrix::SiteSpinor                                                             CoarseSiteVector;
-  typedef Matrix                                                                                             FineDiracMatrix;
-  typedef typename CoarseDiracMatrix::FineFermionField                                                       FineVector;
-  typedef MultiGridPreconditioner<CoarseSiteVector, CComplex, nBasis, nCoarserLevels - 1, CoarseDiracMatrix> NextPreconditionerLevel;
+  typedef TwoSpinCoarseningPolicy<Lattice<Fobj>, CComplex, nBasis>                                                    CoarseningPolicy;
+  typedef AggregationUsingPolicies<CoarseningPolicy>                                                                  Aggregates;
+  typedef CoarsenedMatrixUsingPolicies<CoarseningPolicy>                                                              CoarseDiracMatrix;
+  typedef typename CoarseDiracMatrix::FermionField                                                                    CoarseVector;
+  typedef typename CoarseDiracMatrix::SiteSpinor                                                                      CoarseSiteVector;
+  typedef Matrix                                                                                                      FineDiracMatrix;
+  typedef typename CoarseDiracMatrix::FineFermionField                                                                FineVector;
+  typedef MultiGridPreconditioner<CoarseSiteVector, CComplex, nBasis, nCoarserLevels - 1, CoarseDiracMatrix>          NextPreconditionerLevel;
 #elif defined (USE_ONESPIN_COARSENING)
   typedef OriginalCoarseningPolicy<Lattice<Fobj>, CComplex, nBasis>                                                   CoarseningPolicy;
   typedef AggregationUsingPolicies<CoarseningPolicy>                                                                  Aggregates;
@@ -404,6 +404,8 @@ public:
   }
 
   void runChecks(RealD tolerance) {
+
+    std::cout << GridLogMGrid(_CurrentLevel) << "Running MG correctness checks" << std::endl;
 
     std::vector<FineVector>   fineTmps(7, _LevelInfo.Grids[_CurrentLevel]);
     std::vector<CoarseVector> coarseTmps(4, _LevelInfo.Grids[_NextCoarserLevel]);
