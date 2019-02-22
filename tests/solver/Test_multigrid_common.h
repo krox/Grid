@@ -301,12 +301,10 @@ public:
 
     auto maxSmootherIter = _MultiGridParams.smootherMaxOuterIter[_CurrentLevel] * _MultiGridParams.smootherMaxInnerIter[_CurrentLevel];
 
-    TrivialPrecon<FineVector>                      fineTrivialPreconditioner;
-    FlexibleGeneralisedMinimalResidual<FineVector> fineFGMRES(_MultiGridParams.smootherTol[_CurrentLevel],
-                                                              maxSmootherIter,
-                                                              fineTrivialPreconditioner,
-                                                              _MultiGridParams.smootherMaxInnerIter[_CurrentLevel],
-                                                              false);
+    GeneralisedMinimalResidual<FineVector> fineGMRES(_MultiGridParams.smootherTol[_CurrentLevel],
+                                                     maxSmootherIter,
+                                                     _MultiGridParams.smootherMaxInnerIter[_CurrentLevel],
+                                                     false);
     _SolveMiscTimer.Stop();
 
     _SolveRestrictionTimer.Start();
@@ -329,7 +327,7 @@ public:
     _SolveMiscTimer.Stop();
 
     _SolveSmootherTimer.Start();
-    fineFGMRES(_FineSmootherMdagMOp, in, out);
+    fineGMRES(_FineSmootherMdagMOp, in, out);
     _SolveSmootherTimer.Stop();
 
     _SolveMiscTimer.Start();
@@ -360,12 +358,10 @@ public:
     auto smootherMaxIter = _MultiGridParams.smootherMaxOuterIter[_CurrentLevel] * _MultiGridParams.smootherMaxInnerIter[_CurrentLevel];
     auto kCycleMaxIter   = _MultiGridParams.kCycleMaxOuterIter[_CurrentLevel] * _MultiGridParams.kCycleMaxInnerIter[_CurrentLevel];
 
-    TrivialPrecon<FineVector>                        fineTrivialPreconditioner;
-    FlexibleGeneralisedMinimalResidual<FineVector>   fineFGMRES(_MultiGridParams.smootherTol[_CurrentLevel],
-                                                              smootherMaxIter,
-                                                              fineTrivialPreconditioner,
-                                                              _MultiGridParams.smootherMaxInnerIter[_CurrentLevel],
-                                                              false);
+    GeneralisedMinimalResidual<FineVector> fineGMRES(_MultiGridParams.smootherTol[_CurrentLevel],
+                                                     smootherMaxIter,
+                                                     _MultiGridParams.smootherMaxInnerIter[_CurrentLevel],
+                                                     false);
     FlexibleGeneralisedMinimalResidual<CoarseVector> coarseFGMRES(_MultiGridParams.kCycleTol[_CurrentLevel],
                                                                   kCycleMaxIter,
                                                                   *_NextPreconditionerLevel,
@@ -393,7 +389,7 @@ public:
     _SolveMiscTimer.Stop();
 
     _SolveSmootherTimer.Start();
-    fineFGMRES(_FineSmootherMdagMOp, in, out);
+    fineGMRES(_FineSmootherMdagMOp, in, out);
     _SolveSmootherTimer.Stop();
 
     _SolveMiscTimer.Start();
@@ -650,13 +646,12 @@ public:
     auto coarseSolverMaxIter = _MultiGridParams.coarseSolverMaxOuterIter * _MultiGridParams.coarseSolverMaxInnerIter;
 
     // On the coarsest level we only have what I above call the fine level, no coarse one
-    TrivialPrecon<FineVector>                      fineTrivialPreconditioner;
-    FlexibleGeneralisedMinimalResidual<FineVector> fineFGMRES(
-      _MultiGridParams.coarseSolverTol, coarseSolverMaxIter, fineTrivialPreconditioner, _MultiGridParams.coarseSolverMaxInnerIter, false);
+    GeneralisedMinimalResidual<FineVector> fineGMRES(
+      _MultiGridParams.coarseSolverTol, coarseSolverMaxIter, _MultiGridParams.coarseSolverMaxInnerIter, false);
     _SolveMiscTimer.Stop();
 
     _SolveSmootherTimer.Start();
-    fineFGMRES(_FineMdagMOp, in, out);
+    fineGMRES(_FineMdagMOp, in, out);
     _SolveSmootherTimer.Stop();
 
     _SolveTotalTimer.Stop();
