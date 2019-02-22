@@ -225,6 +225,7 @@ public:
   GridStopWatch _SolveRestrictionTimer;
   GridStopWatch _SolveProlongationTimer;
   GridStopWatch _SolveSmootherTimer;
+  GridStopWatch _SolveMiscTimer;
   GridStopWatch _SolveNextLevelTimer;
 
   /////////////////////////////////////////////
@@ -289,6 +290,7 @@ public:
 
     _SolveTotalTimer.Start();
 
+    _SolveMiscTimer.Start();
     RealD inputNorm = norm2(in);
 
     _NextPreconditionerLevel->_FineSol = zero;
@@ -305,6 +307,7 @@ public:
                                                               false);
 
     MdagMLinearOperator<FineDiracMatrix, FineVector> fineSmootherMdagMOp(_SmootherMatrix);
+    _SolveMiscTimer.Stop();
 
     _SolveRestrictionTimer.Start();
     _Aggregates.ProjectToSubspace(_NextPreconditionerLevel->_FineSrc, in);
@@ -318,15 +321,18 @@ public:
     _Aggregates.PromoteFromSubspace(_NextPreconditionerLevel->_FineSol, out);
     _SolveProlongationTimer.Stop();
 
+    _SolveMiscTimer.Start();
     _FineMdagMOp.Op(out, fineTmp);
     fineTmp                                = in - fineTmp;
     auto r                                 = norm2(fineTmp);
     auto residualAfterCoarseGridCorrection = std::sqrt(r / inputNorm);
+    _SolveMiscTimer.Stop();
 
     _SolveSmootherTimer.Start();
     fineFGMRES(fineSmootherMdagMOp, in, out);
     _SolveSmootherTimer.Stop();
 
+    _SolveMiscTimer.Start();
     _FineMdagMOp.Op(out, fineTmp);
     fineTmp                        = in - fineTmp;
     r                              = norm2(fineTmp);
@@ -335,6 +341,7 @@ public:
     std::cout << GridLogMGrid(_CurrentLevel) << "V-cycle: Input norm = " << std::sqrt(inputNorm)
               << " Coarse residual = " << residualAfterCoarseGridCorrection << " Post-Smoother residual = " << residualAfterPostSmoother
               << std::endl;
+    _SolveMiscTimer.Stop();
 
     _SolveTotalTimer.Stop();
   }
@@ -343,6 +350,7 @@ public:
 
     _SolveTotalTimer.Start();
 
+    _SolveMiscTimer.Start();
     RealD inputNorm = norm2(in);
 
     _NextPreconditionerLevel->_FineSol = zero;
@@ -363,6 +371,7 @@ public:
                                                                   *_NextPreconditionerLevel,
                                                                   _MultiGridParams.kCycleMaxInnerIter[_CurrentLevel],
                                                                   false);
+    _SolveMiscTimer.Stop();
 
     MdagMLinearOperator<FineDiracMatrix, FineVector>     fineSmootherMdagMOp(_SmootherMatrix);
     MdagMLinearOperator<CoarseDiracMatrix, CoarseVector> coarseMdagMOp(_CoarseMatrix);
@@ -379,15 +388,18 @@ public:
     _Aggregates.PromoteFromSubspace(_NextPreconditionerLevel->_FineSol, out);
     _SolveProlongationTimer.Stop();
 
+    _SolveMiscTimer.Start();
     _FineMdagMOp.Op(out, fineTmp);
     fineTmp                                = in - fineTmp;
     auto r                                 = norm2(fineTmp);
     auto residualAfterCoarseGridCorrection = std::sqrt(r / inputNorm);
+    _SolveMiscTimer.Stop();
 
     _SolveSmootherTimer.Start();
     fineFGMRES(fineSmootherMdagMOp, in, out);
     _SolveSmootherTimer.Stop();
 
+    _SolveMiscTimer.Start();
     _FineMdagMOp.Op(out, fineTmp);
     fineTmp                        = in - fineTmp;
     r                              = norm2(fineTmp);
@@ -396,6 +408,7 @@ public:
     std::cout << GridLogMGrid(_CurrentLevel) << "K-cycle: Input norm = " << std::sqrt(inputNorm)
               << " Coarse residual = " << residualAfterCoarseGridCorrection << " Post-Smoother residual = " << residualAfterPostSmoother
               << std::endl;
+    _SolveMiscTimer.Stop();
 
     _SolveTotalTimer.Stop();
   }
@@ -553,6 +566,7 @@ public:
     std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve restriction      " <<          _SolveRestrictionTimer.Elapsed() << std::endl;
     std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve prolongation     " <<         _SolveProlongationTimer.Elapsed() << std::endl;
     std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve smoother         " <<             _SolveSmootherTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve misc             " <<                 _SolveMiscTimer.Elapsed() << std::endl;
     std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve next level       " <<            _SolveNextLevelTimer.Elapsed() << std::endl;
     // clang-format on
 
@@ -570,6 +584,7 @@ public:
     _SolveRestrictionTimer.Reset();
     _SolveProlongationTimer.Reset();
     _SolveSmootherTimer.Reset();
+    _SolveMiscTimer.Reset();
     _SolveNextLevelTimer.Reset();
 
     _NextPreconditionerLevel->resetTimers();
@@ -606,6 +621,7 @@ public:
 
   GridStopWatch _SolveTotalTimer;
   GridStopWatch _SolveSmootherTimer;
+  GridStopWatch _SolveMiscTimer;
 
   /////////////////////////////////////////////
   // Member Functions
@@ -630,6 +646,7 @@ public:
 
     _SolveTotalTimer.Start();
 
+    _SolveMiscTimer.Start();
     conformable(_LevelInfo.Grids[_CurrentLevel], in._grid);
     conformable(in, out);
 
@@ -639,6 +656,7 @@ public:
     TrivialPrecon<FineVector>                      fineTrivialPreconditioner;
     FlexibleGeneralisedMinimalResidual<FineVector> fineFGMRES(
       _MultiGridParams.coarseSolverTol, coarseSolverMaxIter, fineTrivialPreconditioner, _MultiGridParams.coarseSolverMaxInnerIter, false);
+    _SolveMiscTimer.Stop();
 
     _SolveSmootherTimer.Start();
     fineFGMRES(_FineMdagMOp, in, out);
@@ -654,6 +672,7 @@ public:
     // clang-format off
     std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve total            " <<    _SolveTotalTimer.Elapsed() << std::endl;
     std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve smoother         " << _SolveSmootherTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve misc             " <<     _SolveMiscTimer.Elapsed() << std::endl;
     // clang-format on
   }
 
@@ -661,6 +680,7 @@ public:
 
     _SolveTotalTimer.Reset();
     _SolveSmootherTimer.Reset();
+    _SolveMiscTimer.Reset();
   }
 };
 
