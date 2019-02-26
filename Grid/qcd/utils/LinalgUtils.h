@@ -176,6 +176,23 @@ void G5R5(Lattice<vobj> &z,const Lattice<vobj> &x)
 }
 
 // I explicitly need these outside the QCD namespace
+template<class vobj>
+void orthogonalise(std::vector<Lattice<vobj>> &x) {
+  auto n = x.size();
+  for (int i = 0; i < n; ++i) {
+    conformable(x[i], x[0]);
+  }
+
+  for(int v = 0; v < n; ++v) {
+    for(int u = 0; u < v; ++u) {
+      auto ip = innerProduct(x[u], x[v]);
+      axpy(x[v], -ip, x[u], x[v]);
+    }
+    auto invNorm = std::pow(norm2(x[v]), -0.5);
+    x[v] = invNorm * x[v];
+  }
+}
+
 template<typename vobj>
 void G5C(Lattice<vobj> &z, const Lattice<vobj> &x)
 {
