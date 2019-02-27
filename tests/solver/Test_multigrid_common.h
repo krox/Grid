@@ -98,7 +98,8 @@ public:
                                   RealD,            mass,
                                   RealD,            csw,
                                   std::string,      config,
-                                  std::string,      sourceType
+                                  std::string,      sourceType,
+                                  bool,             useAntiPeriodicBC
                                   );
 
   // constructor with default values
@@ -108,7 +109,8 @@ public:
                     RealD       _mass                    = 0.1,
                     RealD       _csw                     = 1.0,
                     std::string _config                  = "foo",
-                    std::string _sourceType              = "random"
+                    std::string _sourceType              = "random",
+                    bool _useAntiPeriodicBC              = false
                     )
   : outerSolverTol(_outerSolverTol)
   , outerSolverMaxOuterIter(_outerSolverMaxOuterIter)
@@ -117,6 +119,7 @@ public:
   , csw(_csw)
   , config(_config)
   , sourceType(_sourceType)
+  , useAntiPeriodicBC(_useAntiPeriodicBC)
   {}
 };
 
