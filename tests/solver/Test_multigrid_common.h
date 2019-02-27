@@ -43,6 +43,7 @@ public:
                                   int,                           nLevels,
                                   std::vector<std::vector<int>>, blockSizes,           // size == nLevels - 1
                                   std::vector<int>,              setupIter,            // size == nLevels - 1
+                                  bool,                          startSubspaceFromRandom,
                                   std::vector<double>,           smootherTol,          // size == nLevels - 1
                                   std::vector<int>,              smootherMaxOuterIter, // size == nLevels - 1
                                   std::vector<int>,              smootherMaxInnerIter, // size == nLevels - 1
@@ -62,6 +63,7 @@ public:
                   std::vector<double>           _smootherTol              = {1e-14},
                   std::vector<int>              _smootherMaxOuterIter     = {4},
                   std::vector<int>              _smootherMaxInnerIter     = {4},
+                  bool                          _startSubspaceFromRandom  = true,
                   bool                          _kCycle                   = false,
                   std::vector<double>           _kCycleTol                = {1e-1},
                   std::vector<int>              _kCycleMaxOuterIter       = {2},
@@ -73,6 +75,7 @@ public:
   : nLevels(_nLevels)
   , blockSizes(_blockSizes)
   , setupIter(_setupIter)
+  , startSubspaceFromRandom(_startSubspaceFromRandom)
   , smootherTol(_smootherTol)
   , smootherMaxOuterIter(_smootherMaxOuterIter)
   , smootherMaxInnerIter(_smootherMaxInnerIter)
@@ -308,12 +311,15 @@ public:
 
   std::vector<FineVector> _TmpTestVectors;
 
+  bool _StartSubspaceFromRandom;
+
   std::unique_ptr<NextPreconditionerLevel> _NextPreconditionerLevel;
 
   GridStopWatch _InitialSetupTotalTimer;
   GridStopWatch _InitialSetupCreateSubspaceTimer;
   GridStopWatch _InitialSetupCopySubspaceToTmpVectorsTimer;
   GridStopWatch _InitialSetupOrthogonaliseSubspaceTimer;
+  GridStopWatch _InitialSetupProjectSubspaceTimer;
   GridStopWatch _InitialSetupProjectToChiralitiesTimer;
   GridStopWatch _InitialSetupCoarsenOperatorTimer;
   GridStopWatch _InitialSetupNextLevelTimer;
@@ -348,7 +354,13 @@ public:
     , _FineSmootherMdagMOp(_SmootherMatrix)
     , _FineSrc(_LevelInfo.Grids[_CurrentLevel])
     , _FineSol(_LevelInfo.Grids[_CurrentLevel])
-    , _TmpTestVectors(nB, _LevelInfo.Grids[_CurrentLevel]) {
+    , _TmpTestVectors(nB, _LevelInfo.Grids[_CurrentLevel])
+    , _StartSubspaceFromRandom((_CurrentLevel == 0) ? true : _MultiGridParams.startSubspaceFromRandom) {
+
+    if(_StartSubspaceFromRandom)
+      std::cout << GridLogMGrid(_CurrentLevel) << "Will be generating Subspace from random vectors" << std::endl;
+    else
+      std::cout << GridLogMGrid(_CurrentLevel) << "Will be using projected subspace from previous level" << std::endl;
 
     _NextPreconditionerLevel
       = std::unique_ptr<NextPreconditionerLevel>(new NextPreconditionerLevel(_MultiGridParams, _LevelInfo, _CoarseMatrix, _CoarseMatrix));
@@ -363,7 +375,8 @@ public:
     std::cout << GridLogMGrid(_CurrentLevel) << "Running initial setup phase" << std::endl;
 
     _InitialSetupCreateSubspaceTimer.Start();
-    _Aggregates.CreateSubspaceDDalphaAMG(_LevelInfo.PRNGs[_CurrentLevel], _FineSmootherMdagMOp, nB, _MultiGridParams.smootherMaxInnerIter[_CurrentLevel]);
+    _Aggregates.CreateSubspaceDDalphaAMG(
+      _LevelInfo.PRNGs[_CurrentLevel], _FineSmootherMdagMOp, _StartSubspaceFromRandom, nB, _MultiGridParams.smootherMaxInnerIter[_CurrentLevel]);
     _InitialSetupCreateSubspaceTimer.Stop();
 
     _InitialSetupCopySubspaceToTmpVectorsTimer.Start();
@@ -377,6 +390,12 @@ public:
     _InitialSetupProjectToChiralitiesTimer.Start();
     _Aggregates.DoChiralDoubling();
     _InitialSetupProjectToChiralitiesTimer.Stop();
+
+    if(!_NextPreconditionerLevel->_StartSubspaceFromRandom) {
+      _InitialSetupProjectSubspaceTimer.Start();
+      projectSubspaceDownwardsIfNecessary(); // NOTE: function handles internally which levels need to project
+      _InitialSetupProjectSubspaceTimer.Stop();
+    }
 
     _InitialSetupCoarsenOperatorTimer.Start();
     _CoarseMatrix.CoarsenOperator(_LevelInfo.Grids[_CurrentLevel], _FineMdagMOp, _Aggregates);
@@ -711,6 +730,7 @@ public:
     std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup initial create subspace          " <<             _InitialSetupCreateSubspaceTimer.Elapsed() << std::endl;
     std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup initial copy subspace to tmp     " <<   _InitialSetupCopySubspaceToTmpVectorsTimer.Elapsed() << std::endl;
     std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup initial orthogonalise subspace   " <<      _InitialSetupOrthogonaliseSubspaceTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup initial project subspace down    " <<            _InitialSetupProjectSubspaceTimer.Elapsed() << std::endl;
     std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup initial project chiral           " <<       _InitialSetupProjectToChiralitiesTimer.Elapsed() << std::endl;
     std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup initial coarsen operator         " <<            _InitialSetupCoarsenOperatorTimer.Elapsed() << std::endl;
     std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup initial next level               " <<                  _InitialSetupNextLevelTimer.Elapsed() << std::endl;
@@ -741,6 +761,7 @@ public:
     _InitialSetupCreateSubspaceTimer.Reset();
     _InitialSetupCopySubspaceToTmpVectorsTimer.Reset();
     _InitialSetupOrthogonaliseSubspaceTimer.Reset();
+    _InitialSetupProjectSubspaceTimer.Reset();
     _InitialSetupProjectToChiralitiesTimer.Reset();
     _InitialSetupCoarsenOperatorTimer.Reset();
     _InitialSetupNextLevelTimer.Reset();
@@ -861,6 +882,8 @@ public:
   FineVector _FineSrc;
   FineVector _FineSol;
 
+  bool _StartSubspaceFromRandom;
+
   GridStopWatch _SolveTotalTimer;
   GridStopWatch _SolveSmootherTimer;
   GridStopWatch _SolveMiscTimer;
@@ -878,7 +901,10 @@ public:
     , _FineMdagMOp(_FineMatrix)
     , _FineSmootherMdagMOp(_SmootherMatrix)
     , _FineSrc(_LevelInfo.Grids[_CurrentLevel])
-    , _FineSol(_LevelInfo.Grids[_CurrentLevel]) {
+    , _FineSol(_LevelInfo.Grids[_CurrentLevel])
+    , _StartSubspaceFromRandom(_MultiGridParams.startSubspaceFromRandom) { // Value not important since this level doesn't have a subspace
+
+    std::cout << GridLogMGrid(_CurrentLevel) << "Will not be doing any subspace generation since this is the coarsest level" << std::endl;
 
     resetTimers();
   }

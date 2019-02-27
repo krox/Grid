@@ -531,7 +531,7 @@ namespace Grid {
       Orthogonalise();
     }
 
-    void CreateSubspaceDDalphaAMG(GridParallelRNG &RNG, LinearOperatorBase<FineFermionField> &linop, int nn = Nbasis, Integer restartLength = 20) {
+    void CreateSubspaceDDalphaAMG(GridParallelRNG &RNG, LinearOperatorBase<FineFermionField> &linop, bool startFromRandom, int nn = Nbasis, Integer restartLength = 20) {
       RealD            scale;
       FineFermionField tmp(_fineGrid);
       FineFermionField Mphi(_fineGrid);
@@ -540,7 +540,8 @@ namespace Grid {
       GeneralisedMinimalResidual<FineFermionField> GMRES(1.0e-14, restartLength, restartLength, false);
 
       for(int b = 0; b < nn; b++) {
-        gaussian(RNG, _subspace[b]);
+        if(startFromRandom)
+          gaussian(RNG, _subspace[b]);
 
         linop.Op(_subspace[b], Mphi);
         auto normRandom = norm2(Mphi);
@@ -1268,7 +1269,7 @@ namespace Grid {
 
     }
 
-    virtual void CreateSubspaceDDalphaAMG(GridParallelRNG &RNG, LinearOperatorBase<FineField> &linop, int nn = nbasis, Integer restartLength = 20) {
+    virtual void CreateSubspaceDDalphaAMG(GridParallelRNG &RNG, LinearOperatorBase<FineField> &linop, bool startFromRandom, int nn = nbasis, Integer restartLength = 20) {
       RealD     scale;
       FineField tmp(FineGrid);
       FineField Mphi(FineGrid);
@@ -1277,7 +1278,8 @@ namespace Grid {
       GeneralisedMinimalResidual<FineField> GMRES(1.0e-14, restartLength, restartLength, false);
 
       for(int b = 0; b < nn; b++) {
-        gaussian(RNG, subspace[b]);
+        if(startFromRandom)
+          gaussian(RNG, subspace[b]);
 
         linop.Op(subspace[b], Mphi);
         auto normRandom = norm2(Mphi);
