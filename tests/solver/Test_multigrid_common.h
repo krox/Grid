@@ -85,6 +85,45 @@ public:
   , coarseSolverMaxInnerIter(_coarseSolverMaxInnerIter)
   {}
 };
+
+class MGTestOtherParams : Serializable {
+public:
+  GRID_SERIALIZABLE_CLASS_MEMBERS(MGTestOtherParams,
+                                  RealD,            outerSolverTol,
+                                  Integer,          outerSolverMaxOuterIter,
+                                  Integer,          outerSolverMaxInnerIter,
+                                  RealD,            mass,
+                                  RealD,            csw,
+                                  std::string,      config,
+                                  std::string,      sourceType
+                                  );
+
+  // constructor with default values
+  MGTestOtherParams(RealD       _outerSolverTol          = 1e-12,
+                    Integer     _outerSolverMaxOuterIter = 100,
+                    Integer     _outerSolverMaxInnerIter = 20,
+                    RealD       _mass                    = 0.1,
+                    RealD       _csw                     = 1.0,
+                    std::string _config                  = "foo",
+                    std::string _sourceType              = "random"
+                    )
+  : outerSolverTol(_outerSolverTol)
+  , outerSolverMaxOuterIter(_outerSolverMaxOuterIter)
+  , outerSolverMaxInnerIter(_outerSolverMaxInnerIter)
+  , mass(_mass)
+  , csw(_csw)
+  , config(_config)
+  , sourceType(_sourceType)
+  {}
+};
+
+class MGTestParams : Serializable {
+public:
+  GRID_SERIALIZABLE_CLASS_MEMBERS(MGTestParams,
+                                  MultiGridParams,   mg,
+                                  MGTestOtherParams, test
+                                  );
+};
 // clang-format on
 
 void checkParameterValidity(MultiGridParams const &params) {
@@ -99,6 +138,17 @@ void checkParameterValidity(MultiGridParams const &params) {
   assert(correctSize == params.kCycleTol.size());
   assert(correctSize == params.kCycleMaxOuterIter.size());
   assert(correctSize == params.kCycleMaxInnerIter.size());
+}
+
+void checkParameterValidity(MGTestOtherParams const &params) {
+
+  assert(params.sourceType == "ones" || params.sourceType == "random" || params.sourceType == "gaussian");
+}
+
+void checkParameterValidity(MGTestParams const &params) {
+
+  checkParameterValidity(params.mg);
+  checkParameterValidity(params.test);
 }
 
 template<class Field> void analyseTestVectors(LinearOperatorBase<Field> &Linop, std::vector<Field> const &vectors, int nn) {
