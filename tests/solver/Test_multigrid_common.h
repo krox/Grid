@@ -42,6 +42,7 @@ public:
   GRID_SERIALIZABLE_CLASS_MEMBERS(MultiGridParams,
                                   int,                           nLevels,
                                   std::vector<std::vector<int>>, blockSizes,           // size == nLevels - 1
+                                  std::vector<int>,              setupIter,            // size == nLevels - 1
                                   std::vector<double>,           smootherTol,          // size == nLevels - 1
                                   std::vector<int>,              smootherMaxOuterIter, // size == nLevels - 1
                                   std::vector<int>,              smootherMaxInnerIter, // size == nLevels - 1
@@ -51,23 +52,27 @@ public:
                                   std::vector<int>,              kCycleMaxInnerIter,   // size == nLevels - 1
                                   double,                        coarseSolverTol,
                                   int,                           coarseSolverMaxOuterIter,
-                                  int,                           coarseSolverMaxInnerIter);
+                                  int,                           coarseSolverMaxInnerIter
+                                  );
 
   // constructor with default values
   MultiGridParams(int                           _nLevels                  = 2,
                   std::vector<std::vector<int>> _blockSizes               = {{4, 4, 4, 4}},
+                  std::vector<int>              _setupIter                = {4},
                   std::vector<double>           _smootherTol              = {1e-14},
                   std::vector<int>              _smootherMaxOuterIter     = {4},
                   std::vector<int>              _smootherMaxInnerIter     = {4},
-                  bool                          _kCycle                   = true,
+                  bool                          _kCycle                   = false,
                   std::vector<double>           _kCycleTol                = {1e-1},
                   std::vector<int>              _kCycleMaxOuterIter       = {2},
                   std::vector<int>              _kCycleMaxInnerIter       = {5},
                   double                        _coarseSolverTol          = 5e-2,
                   int                           _coarseSolverMaxOuterIter = 10,
-                  int                           _coarseSolverMaxInnerIter = 500)
+                  int                           _coarseSolverMaxInnerIter = 500
+                  )
   : nLevels(_nLevels)
   , blockSizes(_blockSizes)
+  , setupIter(_setupIter)
   , smootherTol(_smootherTol)
   , smootherMaxOuterIter(_smootherMaxOuterIter)
   , smootherMaxInnerIter(_smootherMaxInnerIter)
@@ -87,12 +92,46 @@ void checkParameterValidity(MultiGridParams const &params) {
   auto correctSize = params.nLevels - 1;
 
   assert(correctSize == params.blockSizes.size());
+  assert(correctSize == params.setupIter.size());
   assert(correctSize == params.smootherTol.size());
   assert(correctSize == params.smootherMaxOuterIter.size());
   assert(correctSize == params.smootherMaxInnerIter.size());
   assert(correctSize == params.kCycleTol.size());
   assert(correctSize == params.kCycleMaxOuterIter.size());
   assert(correctSize == params.kCycleMaxInnerIter.size());
+}
+
+template<class Field> void analyseTestVectors(LinearOperatorBase<Field> &Linop, std::vector<Field> const &vectors, int nn) {
+
+  auto positiveOnes = 0;
+
+  std::vector<Field> tmp(4, vectors[0]._grid);
+
+  std::cout << GridLogMessage << "Test vector analysis:" << std::endl;
+
+  for(auto i = 0; i < nn; ++i) {
+
+    Linop.Op(vectors[i], tmp[3]);
+
+    G5C(tmp[0], tmp[3]);
+
+    auto lambda = innerProduct(vectors[i], tmp[0]) / innerProduct(vectors[i], vectors[i]);
+
+    tmp[1] = tmp[0] - lambda * vectors[i];
+
+    auto mu = ::sqrt(norm2(tmp[1]) / norm2(vectors[i]));
+
+    auto nrm = ::sqrt(norm2(vectors[i]));
+
+    if(real(lambda) > 0)
+      positiveOnes++;
+
+    std::cout << GridLogMessage << std::scientific << std::setprecision(2) << std::setw(2) << std::showpos << "vector " << i << ": "
+              << "singular value: " << lambda << ", singular vector precision: " << mu << ", norm: " << nrm << std::endl;
+  }
+  std::cout << GridLogMessage << std::scientific << std::setprecision(2) << std::setw(2) << std::showpos << positiveOnes << " out of " << nn
+            << " vectors were positive" << std::endl;
+  std::cout << std::noshowpos;
 }
 
 struct LevelInfo {
@@ -144,10 +183,12 @@ public:
 template<class Field> class MultiGridPreconditionerBase : public LinearFunction<Field> {
 public:
   virtual ~MultiGridPreconditionerBase()               = default;
-  virtual void setup()                                 = 0;
+  virtual void initialSetup()                          = 0;
+  virtual void iterativeSetup()                        = 0;
   virtual void operator()(Field const &in, Field &out) = 0;
   virtual void runChecks(RealD tolerance)              = 0;
   virtual void reportTimings()                         = 0;
+  virtual void resetTimers()                           = 0;
 };
 
 template<class Fobj, class CComplex, int nBasis, int nCoarserLevels, class Matrix>
@@ -215,13 +256,24 @@ public:
   FineVector _FineSrc;
   FineVector _FineSol;
 
+  std::vector<FineVector> _TmpTestVectors;
+
   std::unique_ptr<NextPreconditionerLevel> _NextPreconditionerLevel;
 
-  GridStopWatch _SetupTotalTimer;
-  GridStopWatch _SetupCreateSubspaceTimer;
-  GridStopWatch _SetupProjectToChiralitiesTimer;
-  GridStopWatch _SetupCoarsenOperatorTimer;
-  GridStopWatch _SetupNextLevelTimer;
+  GridStopWatch _InitialSetupTotalTimer;
+  GridStopWatch _InitialSetupCreateSubspaceTimer;
+  GridStopWatch _InitialSetupCopySubspaceToTmpVectorsTimer;
+  GridStopWatch _InitialSetupOrthogonaliseSubspaceTimer;
+  GridStopWatch _InitialSetupProjectToChiralitiesTimer;
+  GridStopWatch _InitialSetupCoarsenOperatorTimer;
+  GridStopWatch _InitialSetupNextLevelTimer;
+  GridStopWatch _IterativeSetupTotalTimer;
+  GridStopWatch _IterativeSetupOrthogonaliseTestVectorsTimer;
+  GridStopWatch _IterativeSetupOperatorTimer;
+  GridStopWatch _IterativeSetupUpdateTestVectorTimer;
+  GridStopWatch _IterativeSetupCopyTmpVectorsToSubspace;
+  GridStopWatch _IterativeSetupCoarsenOperatorTimer;
+  GridStopWatch _IterativeSetupNextLevelTimer;
   GridStopWatch _SolveTotalTimer;
   GridStopWatch _SolveRestrictionTimer;
   GridStopWatch _SolveProlongationTimer;
@@ -245,7 +297,8 @@ public:
     , _FineMdagMOp(_FineMatrix)
     , _FineSmootherMdagMOp(_SmootherMatrix)
     , _FineSrc(_LevelInfo.Grids[_CurrentLevel])
-    , _FineSol(_LevelInfo.Grids[_CurrentLevel]) {
+    , _FineSol(_LevelInfo.Grids[_CurrentLevel])
+    , _TmpTestVectors(nB, _LevelInfo.Grids[_CurrentLevel]) {
 
     _NextPreconditionerLevel
       = std::unique_ptr<NextPreconditionerLevel>(new NextPreconditionerLevel(_MultiGridParams, _LevelInfo, _CoarseMatrix, _CoarseMatrix));
@@ -253,27 +306,78 @@ public:
     resetTimers();
   }
 
-  void setup() {
+  void initialSetup() {
 
-    _SetupTotalTimer.Start();
+    _InitialSetupTotalTimer.Start();
 
-    _SetupCreateSubspaceTimer.Start();
+    std::cout << GridLogMGrid(_CurrentLevel) << "Running initial setup phase" << std::endl;
+
+    _InitialSetupCreateSubspaceTimer.Start();
     _Aggregates.CreateSubspaceDDalphaAMG(_LevelInfo.PRNGs[_CurrentLevel], _FineSmootherMdagMOp, nB, _MultiGridParams.smootherMaxInnerIter[_CurrentLevel]);
-    _SetupCreateSubspaceTimer.Stop();
+    _InitialSetupCreateSubspaceTimer.Stop();
 
-    _SetupProjectToChiralitiesTimer.Start();
+    _InitialSetupCopySubspaceToTmpVectorsTimer.Start();
+    copySubspaceToTmpVectors();
+    _InitialSetupCopySubspaceToTmpVectorsTimer.Stop();
+
+    _InitialSetupOrthogonaliseSubspaceTimer.Start();
+    _Aggregates.Orthogonalise();
+    _InitialSetupOrthogonaliseSubspaceTimer.Stop();
+
+    _InitialSetupProjectToChiralitiesTimer.Start();
     _Aggregates.DoChiralDoubling();
-    _SetupProjectToChiralitiesTimer.Stop();
+    _InitialSetupProjectToChiralitiesTimer.Stop();
 
-    _SetupCoarsenOperatorTimer.Start();
+    _InitialSetupCoarsenOperatorTimer.Start();
     _CoarseMatrix.CoarsenOperator(_LevelInfo.Grids[_CurrentLevel], _FineMdagMOp, _Aggregates);
-    _SetupCoarsenOperatorTimer.Stop();
+    _InitialSetupCoarsenOperatorTimer.Stop();
 
-    _SetupNextLevelTimer.Start();
-    _NextPreconditionerLevel->setup();
-    _SetupNextLevelTimer.Stop();
+    _Aggregates.CheckOrthogonal();
 
-    _SetupTotalTimer.Stop();
+    _InitialSetupNextLevelTimer.Start();
+    _NextPreconditionerLevel->initialSetup();
+    _InitialSetupNextLevelTimer.Stop();
+
+    _InitialSetupTotalTimer.Stop();
+  }
+
+  void iterativeSetup() { // this corresponds to inv_iter_inv_fcycle_P in wuppertal codebase
+
+    if(_MultiGridParams.setupIter[_CurrentLevel] > 0) {
+      _IterativeSetupTotalTimer.Start();
+
+      std::cout << GridLogMGrid(_CurrentLevel) << "Running iterative setup phase with " << _MultiGridParams.setupIter[_CurrentLevel] << " iterations" << std::endl;
+
+      for(auto i = 0; i < _MultiGridParams.setupIter[_CurrentLevel]; ++i) {
+        std::cout << GridLogMGrid(_CurrentLevel) << "Running setup iteration " << i + 1 << std::endl;
+
+        _IterativeSetupOrthogonaliseTestVectorsTimer.Start();
+        orthogonalise(_TmpTestVectors);
+        _IterativeSetupOrthogonaliseTestVectorsTimer.Stop();
+
+        for(auto n = 0; n < nB; ++n) {
+          _FineSol = zero;
+
+          _IterativeSetupOperatorTimer.Start();
+          operator()(_TmpTestVectors[n], _FineSol); // maybe _FineSol needs to be set to zero beforehand
+          _IterativeSetupOperatorTimer.Stop();
+
+          _IterativeSetupUpdateTestVectorTimer.Start();
+          updateTestVector(n);
+          _IterativeSetupUpdateTestVectorTimer.Stop();
+        }
+
+        recreateSubspacesAndCoarseOperators(); // profiled inside the function
+      }
+
+      _Aggregates.CheckOrthogonal();
+
+      _IterativeSetupNextLevelTimer.Start();
+      _NextPreconditionerLevel->iterativeSetup();
+      _IterativeSetupNextLevelTimer.Stop();
+
+      _IterativeSetupTotalTimer.Stop();
+    }
   }
 
   virtual void operator()(FineVector const &in, FineVector &out) {
@@ -546,19 +650,36 @@ public:
 
   void reportTimings() {
 
+    auto totalSetupTime = _InitialSetupTotalTimer.Elapsed() + _IterativeSetupTotalTimer.Elapsed();
+    auto totalTime = totalSetupTime +  _SolveTotalTimer.Elapsed();
+
     // clang-format off
-    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Sum   total            " <<                _SetupTotalTimer.Elapsed() + _SolveTotalTimer.Elapsed() << std::endl;
-    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup total            " <<                _SetupTotalTimer.Elapsed() << std::endl;
-    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup create subspace  " <<       _SetupCreateSubspaceTimer.Elapsed() << std::endl;
-    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup project chiral   " << _SetupProjectToChiralitiesTimer.Elapsed() << std::endl;
-    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup coarsen operator " <<      _SetupCoarsenOperatorTimer.Elapsed() << std::endl;
-    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup next level       " <<            _SetupNextLevelTimer.Elapsed() << std::endl;
-    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve total            " <<                _SolveTotalTimer.Elapsed() << std::endl;
-    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve restriction      " <<          _SolveRestrictionTimer.Elapsed() << std::endl;
-    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve prolongation     " <<         _SolveProlongationTimer.Elapsed() << std::endl;
-    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve smoother         " <<             _SolveSmootherTimer.Elapsed() << std::endl;
-    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve misc             " <<                 _SolveMiscTimer.Elapsed() << std::endl;
-    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve next level       " <<            _SolveNextLevelTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Sum   total                            " <<                totalTime                               << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup total                            " <<                totalSetupTime                          << std::endl;
+
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup initial total                    " <<                      _InitialSetupTotalTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup initial create subspace          " <<             _InitialSetupCreateSubspaceTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup initial copy subspace to tmp     " <<   _InitialSetupCopySubspaceToTmpVectorsTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup initial orthogonalise subspace   " <<      _InitialSetupOrthogonaliseSubspaceTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup initial project chiral           " <<       _InitialSetupProjectToChiralitiesTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup initial coarsen operator         " <<            _InitialSetupCoarsenOperatorTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup initial next level               " <<                  _InitialSetupNextLevelTimer.Elapsed() << std::endl;
+
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup iterative total                  " <<                    _IterativeSetupTotalTimer.Elapsed() << std::endl;
+
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup iterative orthog test vectors    " << _IterativeSetupOrthogonaliseTestVectorsTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup iterative operator               " <<                 _IterativeSetupOperatorTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup iterative update test vector     " <<         _IterativeSetupUpdateTestVectorTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup iterative copy tmp to subspace   " <<      _IterativeSetupCopyTmpVectorsToSubspace.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup iterative coarsen operator       " <<          _IterativeSetupCoarsenOperatorTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Setup iterative next level             " <<                _IterativeSetupNextLevelTimer.Elapsed() << std::endl;
+
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve total                            " <<                             _SolveTotalTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve restriction                      " <<                       _SolveRestrictionTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve prolongation                     " <<                      _SolveProlongationTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve smoother                         " <<                          _SolveSmootherTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve misc                             " <<                              _SolveMiscTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve next level                       " <<                         _SolveNextLevelTimer.Elapsed() << std::endl;
     // clang-format on
 
     _NextPreconditionerLevel->reportTimings();
@@ -566,11 +687,22 @@ public:
 
   void resetTimers() {
 
-    _SetupTotalTimer.Reset();
-    _SetupCreateSubspaceTimer.Reset();
-    _SetupProjectToChiralitiesTimer.Reset();
-    _SetupCoarsenOperatorTimer.Reset();
-    _SetupNextLevelTimer.Reset();
+    _InitialSetupTotalTimer.Reset();
+    _InitialSetupCreateSubspaceTimer.Reset();
+    _InitialSetupCopySubspaceToTmpVectorsTimer.Reset();
+    _InitialSetupOrthogonaliseSubspaceTimer.Reset();
+    _InitialSetupProjectToChiralitiesTimer.Reset();
+    _InitialSetupCoarsenOperatorTimer.Reset();
+    _InitialSetupNextLevelTimer.Reset();
+
+    _IterativeSetupTotalTimer.Reset();
+    _IterativeSetupOrthogonaliseTestVectorsTimer.Reset();
+    _IterativeSetupOperatorTimer.Reset();
+    _IterativeSetupUpdateTestVectorTimer.Reset();
+    _IterativeSetupCopyTmpVectorsToSubspace.Reset();
+    _IterativeSetupCoarsenOperatorTimer.Reset();
+    _IterativeSetupNextLevelTimer.Reset();
+
     _SolveTotalTimer.Reset();
     _SolveRestrictionTimer.Reset();
     _SolveProlongationTimer.Reset();
@@ -579,6 +711,74 @@ public:
     _SolveNextLevelTimer.Reset();
 
     _NextPreconditionerLevel->resetTimers();
+  }
+
+  template<int ncl = nCoarserLevels, typename std::enable_if<(ncl >= 2), int>::type = 0>
+  void projectSubspaceDownwardsIfNecessary() {
+    std::cout << GridLogMGrid(_CurrentLevel) << "Projecting test vectors to next coarser level" << std::endl;
+    for(int n = 0; n < nB; n++) {
+      _Aggregates.ProjectToSubspace(_NextPreconditionerLevel->_Aggregates.Subspace()[n], _TmpTestVectors[n]);
+    }
+  }
+
+  template<int ncl = nCoarserLevels, typename std::enable_if<(ncl <= 1), int>::type = 0>
+  void projectSubspaceDownwardsIfNecessary() {
+    std::cout << GridLogMGrid(_CurrentLevel) << "NOT projecting test vectors to next coarser level" << std::endl;
+  }
+
+  void copySubspaceToTmpVectors() {
+
+    for(int n = 0; n < nB; n++) {
+#if defined(USE_TWOSPIN_COARSENING)
+      _TmpTestVectors[n] = _Aggregates.Subspace()[n];
+#else
+      _TmpTestVectors[n] = _Aggregates.Subspace()[n] + _Aggregates.Subspace()[n + nB];
+#endif
+      std::cout << GridLogMGrid(_CurrentLevel)
+                << "Copied subspace vector " << n << " to tmp vectors. "
+                << "norm2(vec[" << n << "]) = " << norm2(_TmpTestVectors[n]) << std::endl;
+    }
+  }
+
+  void copyTmpVectorsToSubspace() {
+
+    for(int n = 0; n < nB; n++) _Aggregates.Subspace()[n] = _TmpTestVectors[n];
+    _Aggregates.DoChiralDoubling();
+
+    for(int n = 0; n < nB; n++) {
+      std::cout << GridLogMGrid(_CurrentLevel)
+                << "Copied tmp vector " << n << " to subspace vectors. "
+                << "norm2(vec[" << n << "]) = " << norm2(_Aggregates.Subspace()[n])
+#if !defined(USE_TWOSPIN_COARSENING)
+                << " norm2(vec[" << n + nB << "]) = " << norm2(_Aggregates.Subspace()[n + nB])
+#endif
+                << std::endl;
+    }
+  }
+
+  void updateTestVector(int n) {
+
+    _NextPreconditionerLevel->updateTestVector(n);
+
+    auto scale         = std::pow(norm2(_FineSol), -0.5);
+    _TmpTestVectors[n] = scale * _FineSol;
+  }
+
+  void recreateSubspacesAndCoarseOperators() {
+
+    _IterativeSetupCopyTmpVectorsToSubspace.Start();
+    copyTmpVectorsToSubspace();
+    _IterativeSetupCopyTmpVectorsToSubspace.Stop();
+
+    _IterativeSetupCoarsenOperatorTimer.Start();
+    _CoarseMatrix.CoarsenOperator(_LevelInfo.Grids[_CurrentLevel],
+                                  _FineMdagMOp,
+                                  _Aggregates); // reconstruct D_c, this automatically orthogonalizes the aggregates again
+    _IterativeSetupCoarsenOperatorTimer.Stop();
+
+    std::cout << GridLogMGrid(_CurrentLevel) << "Recreated intergrid operators and coarse operator" << std::endl;
+
+    _NextPreconditionerLevel->recreateSubspacesAndCoarseOperators();
   }
 };
 
@@ -633,7 +833,13 @@ public:
     resetTimers();
   }
 
-  void setup() {}
+  void initialSetup() {}
+
+  void iterativeSetup() {}
+
+  void updateTestVector(int n) {}
+
+  void recreateSubspacesAndCoarseOperators() {}
 
   virtual void operator()(FineVector const &in, FineVector &out) {
 
@@ -662,9 +868,9 @@ public:
   void reportTimings() {
 
     // clang-format off
-    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve total            " <<    _SolveTotalTimer.Elapsed() << std::endl;
-    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve smoother         " << _SolveSmootherTimer.Elapsed() << std::endl;
-    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve misc             " <<     _SolveMiscTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve total                            " <<    _SolveTotalTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve smoother                         " << _SolveSmootherTimer.Elapsed() << std::endl;
+    std::cout << GridLogMGrid(_CurrentLevel) << "Time elapsed: Solve misc                             " <<     _SolveMiscTimer.Elapsed() << std::endl;
     // clang-format on
   }
 

@@ -570,7 +570,6 @@ namespace Grid {
                   << " reduction = "            << normFiltered / normRandom
                   << std::endl;
       }
-      Orthogonalise();
     }
 
     void DoChiralDoubling() {
@@ -1308,7 +1307,6 @@ namespace Grid {
                   << " reduction = "            << normFiltered / normRandom
                   << std::endl;
       }
-      Orthogonalise();
     }
 
     void DoChiralDoubling() {
