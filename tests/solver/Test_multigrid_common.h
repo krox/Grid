@@ -448,6 +448,8 @@ public:
       _NextPreconditionerLevel->iterativeSetup();
       _IterativeSetupNextLevelTimer.Stop();
 
+      resetSolveTimers(); // functions needed in solve also get called in iterative setup which makes profiling output incorrect
+
       _IterativeSetupTotalTimer.Stop();
     }
   }
@@ -758,7 +760,7 @@ public:
     _NextPreconditionerLevel->reportTimings();
   }
 
-  void resetTimers() {
+  void resetInitialSetupTimers() {
 
     _InitialSetupTotalTimer.Reset();
     _InitialSetupCreateSubspaceTimer.Reset();
@@ -768,6 +770,9 @@ public:
     _InitialSetupProjectToChiralitiesTimer.Reset();
     _InitialSetupCoarsenOperatorTimer.Reset();
     _InitialSetupNextLevelTimer.Reset();
+  }
+
+  void resetIterativeSetupTimers() {
 
     _IterativeSetupTotalTimer.Reset();
     _IterativeSetupOrthogonaliseTestVectorsTimer.Reset();
@@ -776,6 +781,9 @@ public:
     _IterativeSetupCopyTmpVectorsToSubspace.Reset();
     _IterativeSetupCoarsenOperatorTimer.Reset();
     _IterativeSetupNextLevelTimer.Reset();
+  }
+
+  void resetSolveTimers() {
 
     _SolveTotalTimer.Reset();
     _SolveRestrictionTimer.Reset();
@@ -783,6 +791,15 @@ public:
     _SolveSmootherTimer.Reset();
     _SolveMiscTimer.Reset();
     _SolveNextLevelTimer.Reset();
+
+    _NextPreconditionerLevel->resetSolveTimers();
+  }
+
+  void resetTimers() {
+
+    resetInitialSetupTimers();
+    resetIterativeSetupTimers();
+    resetSolveTimers();
 
     _NextPreconditionerLevel->resetTimers();
   }
@@ -953,11 +970,16 @@ public:
     // clang-format on
   }
 
-  void resetTimers() {
+  void resetSolveTimers() {
 
     _SolveTotalTimer.Reset();
     _SolveSmootherTimer.Reset();
     _SolveMiscTimer.Reset();
+  }
+
+  void resetTimers() {
+
+    resetSolveTimers();
   }
 };
 
