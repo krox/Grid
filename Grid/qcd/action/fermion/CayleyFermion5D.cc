@@ -378,9 +378,10 @@ void CayleyFermion5D<Impl>::MeooeDag    (const FermionField &psi, FermionField &
 
 template<class Impl>
 void  CayleyFermion5D<Impl>::Mdir (const FermionField &psi, FermionField &chi,int dir,int disp){
-  Meo5D(psi,this->tmp());
+  FermionField tmp(this->FermionGrid());
+  Meo5D(psi, tmp);
   // Apply 4d dslash fragment
-  this->DhopDir(this->tmp(),chi,dir,disp);
+  this->DhopDir(tmp,chi,dir,disp);
 }
 // force terms; five routines; default to Dhop on diagonal
 template<class Impl>
