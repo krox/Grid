@@ -204,26 +204,35 @@ public:
 
     // set up values for finest grid
     Grids.push_back(FineGrid);
-    Seeds.push_back({1, 2, 3, 4});
+    Seeds.push_back((FineGrid->Nd() == 4) ? std::vector<int>{1, 2, 3, 4} : std::vector<int> { 5, 6, 7, 8 });
     PRNGs.push_back(GridParallelRNG(Grids.back()));
     PRNGs.back().SeedFixedIntegers(Seeds.back());
 
     // set up values for coarser grids
     for(int level = 1; level < mgParams.nLevels; ++level) {
-      auto Nd  = Grids[level - 1]->_ndimension;
-      auto tmp = Grids[level - 1]->_fdimensions;
-      assert(tmp.size() == Nd);
+      auto Nd               = Grids[level - 1]->Nd();
+      auto fullDimensions4d = extract4dData(Grids[level - 1]->FullDimensions());
 
-      Seeds.push_back(std::vector<int>(Nd));
+      assert(Nd == 4 || Nd == 5);
+      assert(fullDimensions4d.size() == mgParams.blockSizes[level - 1].size());
 
-      for(int d = 0; d < Nd; ++d) {
-        tmp[d] /= mgParams.blockSizes[level - 1][d];
+      Seeds.push_back(std::vector<int>(4));
+
+      for(int d = 0; d < fullDimensions4d.size(); ++d) {
+        fullDimensions4d[d] /= mgParams.blockSizes[level - 1][d];
         Seeds[level][d] = (level)*Nd + d + 1;
       }
 
-      Grids.push_back(QCD::SpaceTimeGrid::makeFourDimGrid(tmp, Grids[level - 1]->_simd_layout, GridDefaultMpi()));
-      PRNGs.push_back(GridParallelRNG(Grids[level]));
+      auto simdLayout4d = extract4dData(Grids[level - 1]->_simd_layout);
+      auto mpiLayout4d  = extract4dData(Grids[level - 1]->_processors);
+      GridCartesian * tmpGrid4d = QCD::SpaceTimeGrid::makeFourDimGrid(fullDimensions4d, simdLayout4d, mpiLayout4d);
+      if(Nd == 4) {
+        Grids.push_back(tmpGrid4d);
+      } else {
+        Grids.push_back(QCD::SpaceTimeGrid::makeFiveDimGrid(1, tmpGrid4d));
+      }
 
+      PRNGs.push_back(GridParallelRNG(Grids[level]));
       PRNGs[level].SeedFixedIntegers(Seeds[level]);
     }
 
@@ -233,6 +242,13 @@ public:
       std::cout << GridLogMessage << "level = " << level << ":" << std::endl;
       Grids[level]->show_decomposition();
     }
+  }
+
+private:
+  template<typename T>
+  std::vector<T> extract4dData(std::vector<T> const &data) {
+    assert(data.size() == 4 || data.size() == 5);
+    return std::vector<T>(data.begin() + (data.size() - 4), data.end());
   }
 };
 
