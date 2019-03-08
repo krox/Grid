@@ -1,6 +1,6 @@
     /*************************************************************************************
 
-    Grid physics library, www.github.com/paboyle/Grid 
+    Grid physics library, www.github.com/paboyle/Grid
 
     Source file: ./lib/tensors/Tensor_exp.h
 
@@ -32,9 +32,9 @@ Author: neo <cossu@post.kek.jp>
 
 namespace Grid {
 
-  /////////////////////////////////////////////// 
+  ///////////////////////////////////////////////
   // Exponentiate function for scalar, vector, matrix
-  /////////////////////////////////////////////// 
+  ///////////////////////////////////////////////
 
 
   template<class vtype> inline iScalar<vtype> Exponentiate(const iScalar<vtype>&r, RealD alpha ,  Integer Nexp = DEFAULT_MAT_EXP)
@@ -55,7 +55,7 @@ template<class vtype, int N> inline iVector<vtype, N> Exponentiate(const iVector
 
 
     // Specialisation: Cayley-Hamilton exponential for SU(3)
-    template<class vtype, typename std::enable_if< GridTypeMapper<vtype>::TensorLevel == 0>::type * =nullptr> 
+    template<class vtype, typename std::enable_if< GridTypeMapper<vtype>::TensorLevel == 0>::type * =nullptr>
     inline iMatrix<vtype,3> Exponentiate(const iMatrix<vtype,3> &arg, RealD alpha  , Integer Nexp = DEFAULT_MAT_EXP )
     {
     // for SU(3) 2x faster than the std implementation using Nexp=12
@@ -76,14 +76,14 @@ template<class vtype, int N> inline iVector<vtype, N> Exponentiate(const iVector
       scalar e2iu, emiu, ixi0, qt;
       scalar f0, f1, f2;
       scalar unity(1.0);
-      
+
       mat iQ2 = arg*arg*alpha*alpha;
-      mat iQ3 = arg*iQ2*alpha;   
+      mat iQ3 = arg*iQ2*alpha;
       // sign in c0 from the conventions on the Ta
       scalar imQ3, reQ2;
       imQ3 = imag( trace(iQ3) );
       reQ2 = real( trace(iQ2) );
-      c0 = -imQ3 * one_over_three;  
+      c0 = -imQ3 * one_over_three;
       c1 = -reQ2 * one_over_two;
 
       // Cayley Hamilton checks to machine precision, tested
@@ -119,7 +119,7 @@ template<class vtype, int N> inline iVector<vtype, N> Exponentiate(const iVector
 
 
 // General exponential
-template<class vtype,int N, typename std::enable_if< GridTypeMapper<vtype>::TensorLevel == 0 >::type * =nullptr> 
+template<class vtype,int N, typename std::enable_if< GridTypeMapper<vtype>::TensorLevel == 0 >::type * =nullptr>
     inline iMatrix<vtype,N> Exponentiate(const iMatrix<vtype,N> &arg, RealD alpha  , Integer Nexp = DEFAULT_MAT_EXP )
     {
     // notice that it actually computes
@@ -136,6 +136,57 @@ template<class vtype,int N, typename std::enable_if< GridTypeMapper<vtype>::Tens
       return temp;
 
     }
+
+// Exponential of a series
+template<class vtype,int N>
+    inline iSeries<vtype,N> Exponentiate(const iSeries<vtype,N> &arg, RealD alpha  , Integer Nexp = DEFAULT_MAT_EXP )
+    {
+      // This way the result will be exact if the constant term of arg is zero (which is the usual case in NSPT)
+      // Actually, there is a factor ~2 optimization opportunity here in that case, by avoiding multiplication by zero
+      if(Nexp < N-1)
+        Nexp = N-1;
+
+      iSeries<vtype,N> unit(1.0);
+      iSeries<vtype,N> temp(unit);
+      for(int i=Nexp; i>=1;--i){
+	      temp *= iScalar<vtype>(alpha/RealD(i));
+	      temp = unit + temp*arg;
+      }
+      return temp;
+
+    }
+
+
+    template<class vtype> inline iScalar<vtype> Logarithm(const iScalar<vtype>&r)
+      {
+        iScalar<vtype> ret;
+        ret._internal = Logarithm(r._internal);
+        return ret;
+      }
+
+    template<class vtype, int N> inline iVector<vtype, N> Logarithm(const iVector<vtype,N>&r)
+      {
+        iVector<vtype, N> ret;
+        for (int i = 0; i < N; i++)
+          ret._internal[i] = Logarithm(r._internal[i]);
+        return ret;
+      }
+
+      // NOTE: basic Taylor series which is only valid if arg is close to 1
+template<class vtype, int N> inline iSeries<vtype,N> Logarithm(const iSeries<vtype,N> & arg)
+{
+    iSeries<vtype,N> x = arg;
+    x(0) -= vtype(1.0);
+    iSeries<vtype,N> temp = x;
+    iSeries<vtype,N> xn = x;
+    for(int i = 2; i < N; ++i)
+    {
+        xn = x*xn;
+        temp += xn*iScalar<vtype>(1.0/i * (i%2?1:-1));
+    }
+    return temp;
+}
+
 
 
 

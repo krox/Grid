@@ -1,6 +1,6 @@
     /*************************************************************************************
 
-    Grid physics library, www.github.com/paboyle/Grid 
+    Grid physics library, www.github.com/paboyle/Grid
 
     Source file: ./lib/tensors/Tensor_unary.h
 
@@ -54,6 +54,14 @@ template<class obj,int N> inline auto func(const iMatrix<obj,N> &z) -> iMatrix<o
       ret._internal[c1][c2] = func( (z._internal[c1][c2]));\
     }}\
     return ret;\
+}\
+template<class obj,int N> inline auto func(const iSeries<obj,N> &z) -> iSeries<obj,N>\
+{\
+    iSeries<obj,N> ret;\
+    for(int c1=0;c1<N;c1++){\
+      ret._internal[c1] = func( (z._internal[c1]));\
+    }\
+    return ret;\
 }
 
 
@@ -80,6 +88,14 @@ template<class obj> inline iScalar<obj> func(const iScalar<obj> &z,scal y)	\
       ret._internal[c1][c2] = func(z._internal[c1][c2],y);	\
     }}\
     return ret;\
+}\
+ template<class obj,int N> inline iSeries<obj,N> func(const iSeries<obj,N> &z,scal y) \
+{\
+   iSeries<obj,N> ret;\
+   for(int c1=0;c1<N;c1++){\
+     ret._internal[c1] = func(z._internal[c1],y);	\
+   }\
+   return ret;\
 }
 
 UNARY(sqrt);
@@ -103,8 +119,8 @@ template<class obj> inline auto toReal(const iScalar<obj> &z) -> typename iScala
  template<class obj,int N> inline auto toReal(const iVector<obj,N> &z) -> typename iVector<obj,N>::Realified
 {
   typename iVector<obj,N>::Realified ret;
-  for(int c1=0;c1<N;c1++){  
-    ret._internal[c1] = toReal(z._internal[c1]); 
+  for(int c1=0;c1<N;c1++){
+    ret._internal[c1] = toReal(z._internal[c1]);
   }
   return ret;
 }
@@ -117,6 +133,14 @@ template<class obj,int N> inline auto toReal(const iMatrix<obj,N> &z) -> typenam
   }}
   return ret;
 }
+template<class obj,int N> inline auto toReal(const iSeries<obj,N> &z) -> typename iSeries<obj,N>::Realified
+{
+ typename iSeries<obj,N>::Realified ret;
+ for(int c1=0;c1<N;c1++){
+   ret._internal[c1] = toReal(z._internal[c1]);
+ }
+ return ret;
+}
 
 template<class obj> inline auto toComplex(const iScalar<obj> &z) -> typename iScalar<obj>::Complexified
 {
@@ -127,8 +151,8 @@ template<class obj> inline auto toComplex(const iScalar<obj> &z) -> typename iSc
  template<class obj,int N> inline auto toComplex(const iVector<obj,N> &z) -> typename iVector<obj,N>::Complexified
 {
   typename iVector<obj,N>::Complexified ret;
-  for(int c1=0;c1<N;c1++){  
-    ret._internal[c1] = toComplex(z._internal[c1]); 
+  for(int c1=0;c1<N;c1++){
+    ret._internal[c1] = toComplex(z._internal[c1]);
   }
   return ret;
 }
@@ -140,6 +164,14 @@ template<class obj,int N> inline auto toComplex(const iMatrix<obj,N> &z) -> type
     ret._internal[c1][c2] = toComplex(z._internal[c1][c2]);
   }}
   return ret;
+}
+ template<class obj,int N> inline auto toComplex(const iSeries<obj,N> &z) -> typename iSeries<obj,N>::Complexified
+{
+ typename iSeries<obj,N>::Complexified ret;
+ for(int c1=0;c1<N;c1++){
+   ret._internal[c1] = toComplex(z._internal[c1]);
+ }
+ return ret;
 }
 
 BINARY_RSCALAR(div,Integer);

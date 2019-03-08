@@ -1,6 +1,6 @@
     /*************************************************************************************
 
-    Grid physics library, www.github.com/paboyle/Grid 
+    Grid physics library, www.github.com/paboyle/Grid
 
     Source file: ./lib/tensors/Tensor_arith_mac.h
 
@@ -46,6 +46,9 @@ namespace Grid {
     // mat  x vec  = vec
     // vec  x scal = vec
     // scal x vec  = vec
+    // ser  x ser  = ser
+    // ser  x scal = ser
+    // scal x ser =  ser
     ///////////////////////////
 template<class rtype,class vtype,class mtype>
 strong_inline  void mac(iScalar<rtype> * __restrict__ ret,const iScalar<vtype> * __restrict__ lhs,const iScalar<mtype> * __restrict__ rhs)
@@ -103,6 +106,28 @@ strong_inline void mac(iVector<rrtype,N> * __restrict__ ret,const iVector<ltype,
     }
     return;
 }
+
+template<class rrtype, class ltype, class rtype, int N>
+strong_inline void mac(iSeries<rrtype,N>*__restrict__ ret, const iSeries<ltype,N>*__restrict__ lhs, const iSeries<rtype,N>*__restrict__ rhs)
+{
+    for(int i = 0; i < N; ++i)
+        mac(&ret->_internal[i], &lhs->_internal[i], &rhs->_internal[i]);
+}
+
+template<class rrtype, class ltype, class rtype, int N>
+strong_inline void mac(iSeries<rrtype,N>*__restrict__ ret, const iScalar<ltype>*__restrict__ lhs, const iSeries<rtype,N>*__restrict__ rhs)
+{
+    for(int i = 0; i < N; ++i)
+        mac(&ret->_internal[i], &lhs->_internal, &rhs->_internal[i]);
+}
+
+template<class rrtype, class ltype, class rtype, int N>
+strong_inline void mac(iSeries<rrtype,N>*__restrict__ ret, const iSeries<ltype,N>*__restrict__ lhs, const iScalar<rtype>*__restrict__ rhs)
+{
+    for(int i = 0; i < N; ++i)
+        mac(&ret->_internal[i], &lhs->_internal[i], &rhs->_internal);
+}
+
 }
 
 #endif

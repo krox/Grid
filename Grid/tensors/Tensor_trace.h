@@ -1,6 +1,6 @@
     /*************************************************************************************
 
-    Grid physics library, www.github.com/paboyle/Grid 
+    Grid physics library, www.github.com/paboyle/Grid
 
     Source file: ./lib/tensors/Tensor_trace.h
 
@@ -63,6 +63,16 @@ template<class vtype,int N>
   inline auto trace(const iVector<vtype,N> &arg) -> iVector<decltype(trace(arg._internal[0])),N>
 {
   iVector<decltype(trace(arg._internal[0])),N> ret;
+  for(int i=0;i<N;i++){
+    ret._internal[i]=trace(arg._internal[i]);
+  }
+  return ret;
+}
+
+template<class vtype,int N>
+  inline auto trace(const iSeries<vtype,N> &arg) -> iSeries<decltype(trace(arg._internal[0])),N>
+{
+  iSeries<decltype(trace(arg._internal[0])),N> ret;
   for(int i=0;i<N;i++){
     ret._internal[i]=trace(arg._internal[i]);
   }

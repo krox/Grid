@@ -1,6 +1,6 @@
     /*************************************************************************************
 
-    Grid physics library, www.github.com/paboyle/Grid 
+    Grid physics library, www.github.com/paboyle/Grid
 
     Source file: ./lib/lattice/Lattice_unary.h
 
@@ -72,10 +72,26 @@ namespace Grid {
 
     return ret;
 
-    
-    
 
-    
+
+
+
+  }
+
+  template<class obj> Lattice<obj> logMat(const Lattice<obj> &rhs){
+    Lattice<obj> ret(rhs._grid);
+    ret.checkerboard = rhs.checkerboard;
+    conformable(ret,rhs);
+    parallel_for(int ss=0;ss<rhs._grid->oSites();ss++){
+      ret._odata[ss]=Logarithm(rhs._odata[ss]);
+    }
+
+    return ret;
+
+
+
+
+
   }
 
 

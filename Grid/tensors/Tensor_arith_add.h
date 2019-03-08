@@ -1,6 +1,6 @@
     /*************************************************************************************
 
-    Grid physics library, www.github.com/paboyle/Grid 
+    Grid physics library, www.github.com/paboyle/Grid
 
     Source file: ./lib/tensors/Tensor_arith_add.h
 
@@ -31,11 +31,11 @@ Author: neo <cossu@post.kek.jp>
 
 namespace Grid {
 
-    
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////// ADD         ///////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////
-    
+
 
 // ADD is simple for now; cannot mix types and straightforward template
 // Scalar +/- Scalar
@@ -56,7 +56,7 @@ namespace Grid {
     }
     return;
   }
-  
+
   template<class vtype,class ltype,class rtype, int N> strong_inline  void add(iMatrix<vtype,N> * __restrict__ ret,
 									const iMatrix<ltype,N> * __restrict__ lhs,
 									const iMatrix<rtype,N> * __restrict__ rhs)
@@ -92,6 +92,38 @@ namespace Grid {
 	  ret->_internal[c1][c2]=lhs->_internal[c1][c2];
       }}
     return;
+  }
+
+  template<class vtype,class ltype,class rtype, int N> strong_inline void add(
+      iSeries<vtype,N>* __restrict__ ret,
+      const iSeries<ltype,N>* __restrict__ lhs,
+      const iSeries<rtype,N>* __restrict__ rhs
+  )
+  {
+      for(int i = 0; i < N; ++i)
+        add(&ret->_internal[i], &lhs->_internal[i], &rhs->_internal[i]);
+  }
+
+  template<class vtype,class ltype,class rtype, int N> strong_inline void add(
+      iSeries<vtype,N>* __restrict__ ret,
+      const iScalar<ltype>* __restrict__ lhs,
+      const iSeries<rtype,N>* __restrict__ rhs
+  )
+  {
+      add(&ret->_internal[0], &lhs->_internal, &rhs->_internal[0]);
+      for(int i = 1; i < N; ++i)
+         ret->_internal[i] = rhs->_internal[i];
+  }
+
+  template<class vtype,class ltype,class rtype, int N> strong_inline void add(
+      iSeries<vtype,N>* __restrict__ ret,
+      const iSeries<ltype,N>* __restrict__ lhs,
+      const iScalar<rtype>* __restrict__ rhs
+  )
+  {
+      add(&ret->_internal[0], &lhs->_internal[0], &rhs->_internal);
+      for(int i = 1; i < N; ++i)
+         ret->_internal[i] = lhs->_internal[i];
   }
 
 
@@ -139,7 +171,32 @@ strong_inline auto operator + (const iScalar<ltype>& lhs,const iMatrix<rtype,N>&
       return ret;
     }
 
+    template<class ltype, class rtype, int N>
+    strong_inline auto operator + (const iSeries<ltype,N>& lhs, const iSeries<rtype,N>& rhs) -> iSeries<decltype(lhs._internal[0]+rhs._internal[0]),N>
+    {
+        typedef iSeries<decltype(lhs._internal[0]+rhs._internal[0]),N> ret_t;
+        ret_t ret;
+        add(&ret,&lhs,&rhs);
+        return ret;
+    }
 
+    template<class ltype, class rtype, int N>
+    strong_inline auto operator + (const iScalar<ltype>& lhs, const iSeries<rtype,N>& rhs) -> iSeries<decltype(lhs._internal+rhs._internal[0]),N>
+    {
+        typedef iSeries<decltype(lhs._internal+rhs._internal[0]),N> ret_t;
+        ret_t ret;
+        add(&ret,&lhs,&rhs);
+        return ret;
+    }
+
+    template<class ltype, class rtype, int N>
+    strong_inline auto operator + (const iSeries<ltype,N>& lhs, const iScalar<rtype>& rhs) -> iSeries<decltype(lhs._internal[0]+rhs._internal),N>
+    {
+        typedef iSeries<decltype(lhs._internal[0]+rhs._internal),N> ret_t;
+        ret_t ret;
+        add(&ret,&lhs,&rhs);
+        return ret;
+    }
 
 }
 

@@ -61,7 +61,7 @@ class iScalar {
 
   // get double precision version
   typedef iScalar<typename GridTypeMapper<vtype>::DoublePrecision> DoublePrecision;
-  
+
   enum { TensorLevel = GridTypeMapper<vtype>::TensorLevel + 1 };
 
   // Scalar no action
@@ -209,7 +209,7 @@ class iVector {
 
   // get double precision version
   typedef iVector<typename GridTypeMapper<vtype>::DoublePrecision, N> DoublePrecision;
-  
+
   template <class T, typename std::enable_if<!isGridTensor<T>::value, T>::type
                          * = nullptr>
   strong_inline auto operator=(T arg) -> iVector<vtype, N> {
@@ -323,7 +323,7 @@ class iMatrix {
 
   // get double precision version
   typedef iMatrix<typename GridTypeMapper<vtype>::DoublePrecision, N> DoublePrecision;
-  
+
   // Tensor removal
   typedef iScalar<tensor_reduced_v> tensor_reduced;
   typedef iMatrix<recurse_scalar_object, N> scalar_object;
@@ -369,8 +369,8 @@ class iMatrix {
     }}
   }
   friend strong_inline void prefetch(iMatrix<vtype,N> &that){
-    for(int i=0;i<N;i++) 
-    for(int j=0;j<N;j++) 
+    for(int i=0;i<N;i++)
+    for(int j=0;j<N;j++)
       prefetch(that._internal[i][j]);
   }
   friend strong_inline void vstream(iMatrix<vtype,N> &out,const iMatrix<vtype,N> &in){
@@ -460,6 +460,127 @@ class iMatrix {
   //  }
 };
 
+template <class vtype, int N>
+class iSeries {
+ public:
+  vtype _internal[N];
+
+  typedef vtype element;
+  typedef typename GridTypeMapper<vtype>::scalar_type scalar_type;
+  typedef typename GridTypeMapper<vtype>::vector_type vector_type;
+  typedef typename GridTypeMapper<vtype>::vector_typeD vector_typeD;
+  typedef typename GridTypeMapper<vtype>::tensor_reduced tensor_reduced_v;
+  typedef typename GridTypeMapper<vtype>::scalar_object recurse_scalar_object;
+  typedef iScalar<tensor_reduced_v> tensor_reduced;
+  typedef iSeries<recurse_scalar_object, N> scalar_object;
+
+  // substitutes a real or complex version with same tensor structure
+  typedef iSeries<typename GridTypeMapper<vtype>::Complexified, N> Complexified;
+  typedef iSeries<typename GridTypeMapper<vtype>::Realified, N> Realified;
+
+  // get double precision version
+  typedef iSeries<typename GridTypeMapper<vtype>::DoublePrecision, N> DoublePrecision;
+
+  template <class T, typename std::enable_if<!isGridTensor<T>::value, T>::type
+                         * = nullptr>
+  strong_inline auto operator=(T arg) -> iSeries<vtype, N> {
+    zeroit(*this);
+    _internal[0] = arg;
+    return *this;
+  }
+
+  enum { TensorLevel = GridTypeMapper<vtype>::TensorLevel + 1 };
+  iSeries(const Zero &z) { *this = zero; };
+  iSeries() = default;
+  iSeries(scalar_type s) {
+    (*this) = s;
+  };  // recurse down and hit the constructor for vector_type
+
+  /*
+  iMatrix(const iMatrix<vtype,N> &copyme)=default;
+  iMatrix(iMatrix<vtype,N> &&copyme)=default;
+  iMatrix<vtype,N> & operator= (const iMatrix<vtype,N> &copyme) = default;
+  iMatrix<vtype,N> & operator= (iMatrix<vtype,N> &&copyme) = default;
+  */
+
+  iSeries<vtype, N> &operator=(const Zero &hero) {
+    zeroit(*this);
+    return *this;
+  }
+
+  friend strong_inline void zeroit(iSeries<vtype, N> &that) {
+    for (int i = 0; i < N; i++) {
+      zeroit(that._internal[i]);
+    }
+  }
+  friend strong_inline void prefetch(iSeries<vtype, N> &that) {
+    for (int i = 0; i < N; i++) prefetch(that._internal[i]);
+  }
+  friend strong_inline void vstream(iSeries<vtype, N> &out,
+                                    const iSeries<vtype, N> &in) {
+    for (int i = 0; i < N; i++) {
+      vstream(out._internal[i], in._internal[i]);
+    }
+  }
+  friend strong_inline void vbroadcast(iSeries<vtype,N> &out,const iSeries<vtype,N> &in,int lane){
+    for(int i=0;i<N;i++){
+      vbroadcast(out._internal[i],in._internal[i],lane);
+    }
+  }
+  friend strong_inline void permute(iSeries<vtype,N> &out,const iSeries<vtype,N> &in,int permutetype){
+    for(int i=0;i<N;i++){
+      permute(out._internal[i],in._internal[i],permutetype);
+    }
+  }
+  friend strong_inline void rotate(iSeries<vtype,N> &out,const iSeries<vtype,N> &in,int rot){
+    for(int i=0;i<N;i++){
+      rotate(out._internal[i],in._internal[i],rot);
+    }
+  }
+  friend strong_inline void exchange(iSeries<vtype,N> &out1,iSeries<vtype,N> &out2,
+				     const iSeries<vtype,N> &in1,const iSeries<vtype,N> &in2,int type){
+    for(int i=0;i<N;i++){
+      exchange(out1._internal[i],out2._internal[i],
+	        in1._internal[i], in2._internal[i],type);
+    }
+  }
+
+  // Unary negation
+  friend strong_inline iSeries<vtype, N> operator-(const iSeries<vtype, N> &r) {
+    iSeries<vtype, N> ret;
+    for (int i = 0; i < N; i++) ret._internal[i] = -r._internal[i];
+    return ret;
+  }
+  // *=,+=,-= operators inherit from corresponding "*,-,+" behaviour
+  strong_inline iSeries<vtype, N> &operator*=(const iScalar<vtype> &r) {
+    *this = (*this) * r;
+    return *this;
+  }
+  strong_inline iSeries<vtype, N> &operator-=(const iSeries<vtype, N> &r) {
+    *this = (*this) - r;
+    return *this;
+  }
+  strong_inline iSeries<vtype, N> &operator+=(const iSeries<vtype, N> &r) {
+    *this = (*this) + r;
+    return *this;
+  }
+  strong_inline vtype &operator()(int i) { return _internal[i]; }
+  strong_inline const vtype &operator()(int i) const { return _internal[i]; }
+  friend std::ostream &operator<<(std::ostream &stream,
+                                  const iSeries<vtype, N> &o) {
+    stream << "Series<" << N << ">{";
+    for (int i = 0; i < N; i++) {
+      stream << o._internal[i];
+      if (i < N - 1) stream << ",";
+    }
+    stream << "}";
+    return stream;
+  };
+  //    strong_inline vtype && operator ()(int i) {
+  //      return _internal[i];
+  //    }
+};
+
 template <class v>
 void vprefetch(const iScalar<v> &vv) {
   vprefetch(vv._internal);
@@ -478,8 +599,11 @@ void vprefetch(const iMatrix<v, N> &vv) {
     }
   }
 }
+template <class v, int N>
+void vprefetch(const iSeries<v, N> &vv) {
+  for (int i = 0; i < N; i++) {
+    vprefetch(vv._internal[i]);
+  }
+}
 }
 #endif
-
-
-

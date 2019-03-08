@@ -1,6 +1,6 @@
     /*************************************************************************************
 
-    Grid physics library, www.github.com/paboyle/Grid 
+    Grid physics library, www.github.com/paboyle/Grid
 
     Source file: ./lib/tensors/Tensor_arith_sub.h
 
@@ -35,7 +35,7 @@ namespace Grid {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////// SUB         ///////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////
-    
+
 
 // SUB is simple for now; cannot mix types and straightforward template
 // Scalar +/- Scalar
@@ -95,6 +95,38 @@ template<class vtype,class ltype,class rtype, int N> strong_inline void sub(iMat
     }}
     return;
 }
+template<class vtype,class ltype,class rtype,int N> strong_inline void sub(iSeries<vtype,N> * __restrict__ ret,
+                                                                    const iSeries<ltype,N> * __restrict__ lhs,
+                                                                    const iSeries<rtype,N> * __restrict__ rhs)
+{
+    for(int c=0;c<N;c++){
+        ret->_internal[c]=lhs->_internal[c]-rhs->_internal[c];
+    }
+    return;
+}
+
+template<class vtype,class ltype,class rtype,int N> strong_inline void sub(iSeries<vtype,N> * __restrict__ ret,
+                                                                    const iScalar<ltype> * __restrict__ lhs,
+                                                                    const iSeries<rtype,N> * __restrict__ rhs)
+{
+    ret->_internal[0] = lhs->internal - rhs->_internal[0];
+    for(int c=1;c<N;c++){
+        ret->_internal[c]= -rhs->_internal[c];
+    }
+    return;
+}
+template<class vtype,class ltype,class rtype,int N> strong_inline void sub(iSeries<vtype,N> * __restrict__ ret,
+                                                                    const iSeries<ltype,N> * __restrict__ lhs,
+                                                                    const iScalar<rtype> * __restrict__ rhs)
+{
+    ret->_internal[0] = lhs->internal[0] - rhs->_internal;
+    for(int c=1;c<N;c++){
+        ret->_internal[c]= lhs->_internal[c];
+    }
+    return;
+}
+
+
 
     // - operator for scalar, vector, matrix
 template<class ltype,class rtype> strong_inline auto
@@ -137,7 +169,30 @@ strong_inline auto operator - (const iMatrix<ltype,N>& lhs,const iScalar<rtype>&
     sub(&ret,&lhs,&rhs);
     return ret;
 }
-
+template<class ltype,class rtype,int N>
+strong_inline auto operator - (const iSeries<ltype,N>& lhs,const iSeries<rtype,N>& rhs) ->iSeries<decltype(lhs._internal[0]-rhs._internal[0]),N>
+{
+    typedef iSeries<decltype(lhs._internal[0]-rhs._internal[0]),N> ret_t;
+    ret_t ret;
+    sub(&ret,&lhs,&rhs);
+    return ret;
+}
+template<class ltype,class rtype,int N>
+strong_inline auto operator - (const iScalar<ltype>& lhs,const iSeries<rtype,N>& rhs) ->iSeries<decltype(lhs._internal-rhs._internal[0]),N>
+{
+    typedef iSeries<decltype(lhs._internal-rhs._internal[0]),N> ret_t;
+    ret_t ret;
+    sub(&ret,&lhs,&rhs);
+    return ret;
+}
+template<class ltype,class rtype,int N>
+strong_inline auto operator - (const iSeries<ltype,N>& lhs,const iScalar<rtype>& rhs) ->iSeries<decltype(lhs._internal[0]-rhs._internal),N>
+{
+    typedef iSeries<decltype(lhs._internal[0]-rhs._internal),N> ret_t;
+    ret_t ret;
+    sub(&ret,&lhs,&rhs);
+    return ret;
+}
 
 }
 

@@ -1,6 +1,6 @@
     /*************************************************************************************
 
-    Grid physics library, www.github.com/paboyle/Grid 
+    Grid physics library, www.github.com/paboyle/Grid
 
     Source file: ./lib/tensors/Tensor_reality.h
 
@@ -30,16 +30,16 @@ Author: neo <cossu@post.kek.jp>
 #define GRID_MATH_REALITY_H
 namespace Grid {
 
-/////////////////////////////////////////////// 
+///////////////////////////////////////////////
 // multiply by I; make recursive.
-/////////////////////////////////////////////// 
-template<class vtype> inline iScalar<vtype> timesI(const iScalar<vtype>&r) 
+///////////////////////////////////////////////
+template<class vtype> inline iScalar<vtype> timesI(const iScalar<vtype>&r)
 {
     iScalar<vtype> ret;
     timesI(ret._internal,r._internal);
     return ret;
 }
-template<class vtype,int N> inline iVector<vtype,N> timesI(const iVector<vtype,N>&r) 
+template<class vtype,int N> inline iVector<vtype,N> timesI(const iVector<vtype,N>&r)
 {
   iVector<vtype,N> ret;
   for(int i=0;i<N;i++){
@@ -56,12 +56,20 @@ template<class vtype,int N> inline iMatrix<vtype,N> timesI(const iMatrix<vtype,N
   }}
   return ret;
 }
+template<class vtype,int N> inline iSeries<vtype,N> timesI(const iSeries<vtype,N>&r)
+{
+  iSeries<vtype,N> ret;
+  for(int i=0;i<N;i++){
+    timesI(ret._internal[i],r._internal[i]);
+  }
+  return ret;
+}
 
-template<class vtype> inline void timesI(iScalar<vtype> &ret,const iScalar<vtype>&r) 
+template<class vtype> inline void timesI(iScalar<vtype> &ret,const iScalar<vtype>&r)
 {
   timesI(ret._internal,r._internal);
 }
-template<class vtype,int N> inline void timesI(iVector<vtype,N> &ret,const iVector<vtype,N>&r) 
+template<class vtype,int N> inline void timesI(iVector<vtype,N> &ret,const iVector<vtype,N>&r)
 {
   for(int i=0;i<N;i++){
     timesI(ret._internal[i],r._internal[i]);
@@ -74,15 +82,21 @@ template<class vtype,int N> inline void  timesI(iMatrix<vtype,N> &ret,const iMat
     timesI(ret._internal[i][j],r._internal[i][j]);
   }}
 }
+template<class vtype,int N> inline void timesI(iSeries<vtype,N> &ret,const iSeries<vtype,N>&r)
+{
+  for(int i=0;i<N;i++){
+    timesI(ret._internal[i],r._internal[i]);
+  }
+}
 
 
-template<class vtype> inline iScalar<vtype> timesMinusI(const iScalar<vtype>&r) 
+template<class vtype> inline iScalar<vtype> timesMinusI(const iScalar<vtype>&r)
 {
     iScalar<vtype> ret;
     timesMinusI(ret._internal,r._internal);
     return ret;
 }
-template<class vtype,int N> inline iVector<vtype,N> timesMinusI(const iVector<vtype,N>&r) 
+template<class vtype,int N> inline iVector<vtype,N> timesMinusI(const iVector<vtype,N>&r)
 {
   iVector<vtype,N> ret;
   for(int i=0;i<N;i++){
@@ -99,12 +113,20 @@ template<class vtype,int N> inline iMatrix<vtype,N> timesMinusI(const iMatrix<vt
   }}
   return ret;
 }
+template<class vtype,int N> inline iSeries<vtype,N> timesMinusI(const iSeries<vtype,N>&r)
+{
+  iSeries<vtype,N> ret;
+  for(int i=0;i<N;i++){
+    timesMinusI(ret._internal[i],r._internal[i]);
+  }
+  return ret;
+}
 
-template<class vtype>  inline void timesMinusI(iScalar<vtype> &ret,const iScalar<vtype>&r) 
+template<class vtype>  inline void timesMinusI(iScalar<vtype> &ret,const iScalar<vtype>&r)
 {
   timesMinusI(ret._internal,r._internal);
 }
-template<class vtype,int N> inline void timesMinusI(iVector<vtype,N> &ret,const iVector<vtype,N>&r) 
+template<class vtype,int N> inline void timesMinusI(iVector<vtype,N> &ret,const iVector<vtype,N>&r)
 {
   for(int i=0;i<N;i++){
     timesMinusI(ret._internal[i],r._internal[i]);
@@ -117,11 +139,17 @@ template<class vtype,int N> inline void  timesMinusI(iMatrix<vtype,N> &ret,const
     timesMinusI(ret._internal[i][j],r._internal[i][j]);
   }}
 }
+template<class vtype,int N> inline void timesMinusI(iSeries<vtype,N> &ret,const iSeries<vtype,N>&r)
+{
+  for(int i=0;i<N;i++){
+    timesMinusI(ret._internal[i],r._internal[i]);
+  }
+}
 
 
-/////////////////////////////////////////////// 
+///////////////////////////////////////////////
 // Conj function for scalar, vector, matrix
-/////////////////////////////////////////////// 
+///////////////////////////////////////////////
 template<class vtype> inline iScalar<vtype> conjugate(const iScalar<vtype>&r)
 {
     iScalar<vtype> ret;
@@ -145,10 +173,18 @@ template<class vtype,int N> inline iMatrix<vtype,N> conjugate(const iMatrix<vtyp
   }}
   return ret;
 }
+template<class vtype,int N> inline iSeries<vtype,N> conjugate(const iSeries<vtype,N>&r)
+{
+  iSeries<vtype,N> ret;
+  for(int i=0;i<N;i++){
+    ret._internal[i] = conjugate(r._internal[i]);
+  }
+  return ret;
+}
 
-/////////////////////////////////////////////// 
+///////////////////////////////////////////////
 // Adj function for scalar, vector, matrix
-/////////////////////////////////////////////// 
+///////////////////////////////////////////////
 template<class vtype> inline iScalar<vtype> adj(const iScalar<vtype>&r)
 {
     iScalar<vtype> ret;
@@ -172,9 +208,14 @@ template<class vtype,int N> inline iMatrix<vtype,N> adj(const iMatrix<vtype,N> &
     }}
     return ret;
 }
-
-
-
+template<class vtype,int N> inline iSeries<vtype,N> adj(const iSeries<vtype,N>&r)
+{
+    iSeries<vtype,N> ret;
+    for(int i=0;i<N;i++){
+        ret._internal[i] = adj(r._internal[i]);
+    }
+    return ret;
+}
 
 
 
@@ -205,7 +246,15 @@ template<class itype,int N> inline auto real(const iVector<itype,N> &z) -> iVect
     }
     return ret;
 }
-    
+template<class itype,int N> inline auto real(const iSeries<itype,N> &z) -> iSeries<decltype(real(z._internal[0])),N>
+{
+    iSeries<decltype(real(z._internal[0])),N> ret;
+    for(int c1=0;c1<N;c1++){
+        ret._internal[c1] = real(z._internal[c1]);
+    }
+    return ret;
+}
+
 template<class itype> inline auto imag(const iScalar<itype> &z) -> iScalar<decltype(imag(z._internal))>
 {
     iScalar<decltype(imag(z._internal))> ret;
@@ -224,6 +273,14 @@ template<class itype,int N> inline auto imag(const iMatrix<itype,N> &z) -> iMatr
 template<class itype,int N> inline auto imag(const iVector<itype,N> &z) -> iVector<decltype(imag(z._internal[0])),N>
 {
     iVector<decltype(imag(z._internal[0])),N> ret;
+    for(int c1=0;c1<N;c1++){
+        ret._internal[c1] = imag(z._internal[c1]);
+    }
+    return ret;
+}
+template<class itype,int N> inline auto imag(const iSeries<itype,N> &z) -> iSeries<decltype(imag(z._internal[0])),N>
+{
+    iSeries<decltype(imag(z._internal[0])),N> ret;
     for(int c1=0;c1<N;c1++){
         ret._internal[c1] = imag(z._internal[c1]);
     }

@@ -1,6 +1,6 @@
     /*************************************************************************************
 
-    Grid physics library, www.github.com/paboyle/Grid 
+    Grid physics library, www.github.com/paboyle/Grid
 
     Source file: ./lib/tensors/Tensor_Ta.h
 
@@ -32,9 +32,9 @@ Author: neo <cossu@post.kek.jp>
 
 namespace Grid {
 
-  /////////////////////////////////////////////// 
+  ///////////////////////////////////////////////
   // Ta function for scalar, vector, matrix
-  /////////////////////////////////////////////// 
+  ///////////////////////////////////////////////
   /*
   inline ComplexF Ta( const ComplexF &arg){    return arg;}
   inline ComplexD Ta( const ComplexD &arg){    return arg;}
@@ -65,12 +65,20 @@ namespace Grid {
       ret=ret - (trace(ret)*factor);
       return ret;
     }
+    template<class vtype,int N> inline iSeries<vtype,N> Ta(const iSeries<vtype,N>&r)
+      {
+        iSeries<vtype,N> ret;
+        for(int i=0;i<N;i++){
+          ret._internal[i] = Ta(r._internal[i]);
+        }
+        return ret;
+      }
 
 
-  /////////////////////////////////////////////// 
-  // ProjectOnGroup function for scalar, vector, matrix 
+  ///////////////////////////////////////////////
+  // ProjectOnGroup function for scalar, vector, matrix
   // Projects on orthogonal, unitary group
-  /////////////////////////////////////////////// 
+  ///////////////////////////////////////////////
 
 
   template<class vtype> inline iScalar<vtype> ProjectOnGroup(const iScalar<vtype>&r)
@@ -87,7 +95,7 @@ namespace Grid {
       }
       return ret;
     }
-  template<class vtype,int N, typename std::enable_if< GridTypeMapper<vtype>::TensorLevel == 0 >::type * =nullptr> 
+  template<class vtype,int N, typename std::enable_if< GridTypeMapper<vtype>::TensorLevel == 0 >::type * =nullptr>
     inline iMatrix<vtype,N> ProjectOnGroup(const iMatrix<vtype,N> &arg)
     {
       // need a check for the group type?
@@ -95,30 +103,33 @@ namespace Grid {
       vtype nrm;
       vtype inner;
       for(int c1=0;c1<N;c1++){
-	zeroit(inner);	
+	zeroit(inner);
 	for(int c2=0;c2<N;c2++)
 	  inner += innerProduct(ret._internal[c1][c2],ret._internal[c1][c2]);
 
 	nrm = rsqrt(inner);
 	for(int c2=0;c2<N;c2++)
 	  ret._internal[c1][c2]*= nrm;
-      
+
 	for (int b=c1+1; b<N; ++b){
 	  decltype(ret._internal[b][b]*ret._internal[b][b]) pr;
 	  zeroit(pr);
 	  for(int c=0; c<N; ++c)
 	    pr += conjugate(ret._internal[c1][c])*ret._internal[b][c];
-	  
+
 	  for(int c=0; c<N; ++c){
 	    ret._internal[b][c] -= pr * ret._internal[c1][c];
 	  }
 	}
-	  
+
       }
       // assuming the determinant is ok
       return ret;
     }
 
+    // NOTE: ProjectOnGroup(iSeries) is kinda complicated: Only the constant
+    // term is a group element, the others have recursive relations. It is
+    // easier to do Exp(Ta(Log(...))) instead.
 
 
 }

@@ -1,6 +1,6 @@
     /*************************************************************************************
 
-    Grid physics library, www.github.com/paboyle/Grid 
+    Grid physics library, www.github.com/paboyle/Grid
 
     Source file: ./lib/tensors/Tensor_arith_mul.h
 
@@ -34,7 +34,7 @@ namespace Grid {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////// MUL         ///////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////
-    
+
 template<class rtype,class vtype,class mtype>
 strong_inline void mult(iScalar<rtype> * __restrict__ ret,const iScalar<mtype> * __restrict__ lhs,const iScalar<vtype> * __restrict__ rhs){
     mult(&ret->_internal,&lhs->_internal,&rhs->_internal);
@@ -100,9 +100,46 @@ strong_inline void mult(iVector<rtype,N> * __restrict__ ret,
                  const iScalar<mtype> * __restrict__ lhs){
     for(int c1=0;c1<N;c1++){
         mult(&ret->_internal[c1],&rhs->_internal[c1],&lhs->_internal);
-    }                 
+    }
 }
-    
+
+template<class rtype, class vtype, class mtype, int N>
+strong_inline void mult(
+    iSeries<rtype,N> * __restrict__ ret,
+    const iSeries<vtype,N> * __restrict__ lhs,
+    const iSeries<mtype,N> * __restrict__ rhs
+)
+{
+    for(int i = 0; i < N; ++i)
+    {
+        mult(&ret->_internal[i], &lhs->_internal[0], &rhs->_internal[i]);
+        for(int j = 1; j <= i; ++j)
+            mac(&ret->_internal[i], &lhs->_internal[j], &rhs->_internal[i-j]);
+    }
+}
+
+template<class rtype, class vtype, class mtype, int N>
+strong_inline void mult(
+    iSeries<rtype,N> * __restrict__ ret,
+    const iScalar<vtype> * __restrict__ lhs,
+    const iSeries<mtype,N> * __restrict__ rhs
+)
+{
+    for(int i = 0; i < N; ++i)
+        mult(&ret->_internal[i], &lhs->_internal, &rhs->_internal[i]);
+}
+
+template<class rtype, class vtype, class mtype, int N>
+strong_inline void mult(
+    iSeries<rtype,N> * __restrict__ ret,
+    const iSeries<vtype,N> * __restrict__ lhs,
+    const iScalar<mtype> * __restrict__ rhs
+)
+{
+    for(int i = 0; i < N; ++i)
+        mult(&ret->_internal[i], &lhs->_internal[i], &rhs->_internal);
+}
+
 
 
 template<class rtype,class vtype,class mtype,int N> strong_inline
@@ -158,7 +195,17 @@ iMatrix<rtype,N> operator / (const iMatrix<rtype,N>& lhs,const iScalar<vtype>& r
     }}
     return ret;
 }
-    
+
+template<class rtype,class vtype,int N> strong_inline
+iSeries<rtype,N> operator / (const iSeries<rtype,N>& lhs,const iScalar<vtype>& rhs)
+{
+    iSeries<rtype,N> ret;
+    for(int i=0;i<N;i++){
+      ret._internal[i] = lhs._internal[i]/rhs._internal;
+    }
+    return ret;
+}
+
     //////////////////////////////////////////////////////////////////
     // Glue operators to mult routines. Must resolve return type cleverly from typeof(internal)
     // since nesting matrix<scalar> x matrix<matrix>-> matrix<matrix>
@@ -194,7 +241,7 @@ template<class l,class r, int N> strong_inline
 auto operator * (const iMatrix<r,N>& lhs,const iScalar<l>& rhs) -> iMatrix<decltype(lhs._internal[0][0]*rhs._internal),N>
 {
     typedef decltype(lhs._internal[0][0]*rhs._internal) ret_t;
-        
+
     iMatrix<ret_t,N> ret;
     for(int c1=0;c1<N;c1++){
     for(int c2=0;c2<N;c2++){
@@ -247,6 +294,32 @@ auto operator * (const iVector<l,N>& lhs,const iScalar<r>& rhs) -> iVector<declt
     return ret;
 }
 
+template<class l, class r, int N> strong_inline
+auto operator *(const iSeries<l,N>& lhs, const iSeries<r,N>& rhs) -> iSeries<decltype(lhs._internal[0]*rhs._internal[0]),N>
+{
+    typedef iSeries<decltype(lhs._internal[0]*rhs._internal[0]),N> ret_t;
+    ret_t ret;
+    mult(&ret, &lhs, &rhs);
+    return ret;
+}
+
+template<class l, class r, int N> strong_inline
+auto operator *(const iScalar<l>& lhs, const iSeries<r,N>& rhs) -> iSeries<decltype(lhs._internal*rhs._internal[0]),N>
+{
+    typedef iSeries<decltype(lhs._internal*rhs._internal[0]),N> ret_t;
+    ret_t ret;
+    mult(&ret, &lhs, &rhs);
+    return ret;
+}
+
+template<class l, class r, int N> strong_inline
+auto operator *(const iSeries<l,N>& lhs, const iScalar<r>& rhs) -> iSeries<decltype(lhs._internal[0]*rhs._internal),N>
+{
+    typedef iSeries<decltype(lhs._internal[0]*rhs._internal),N> ret_t;
+    ret_t ret;
+    mult(&ret, &lhs, &rhs);
+    return ret;
+}
 
 }
 
