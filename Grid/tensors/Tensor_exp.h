@@ -187,6 +187,103 @@ template<class vtype, int N> inline iSeries<vtype,N> Logarithm(const iSeries<vty
     return temp;
 }
 
+///////////////////////////////////////////////
+// Exponentiate "Fast" function for scalar, vector, matrix.
+// This version assumes (without check!) the constant term in the series expansion to be trivial
+///////////////////////////////////////////////
+
+
+template<class vtype> inline iScalar<vtype> ExponentiateFast(const iScalar<vtype>&r, RealD alpha)
+  {
+    iScalar<vtype> ret;
+    ret._internal = ExponentiateFast(r._internal, alpha);
+    return ret;
+  }
+
+template<class vtype, int N> inline iVector<vtype, N> ExponentiateFast(const iVector<vtype,N>&r, RealD alpha)
+  {
+    iVector<vtype, N> ret;
+    for (int i = 0; i < N; i++)
+      ret._internal[i] = ExponentiateFast(r._internal[i], alpha);
+    return ret;
+  }
+
+// NOTE: no overload for iMatrix
+
+/* computes "a = a*b" assuming b(0)=0 and a(0,1,...k-1) = 0 */
+template<class vtype, int N>
+strong_inline void mulAssignFast(iSeries<vtype,N>& a, const iSeries<vtype,N>& b, int k)
+{
+    for(int i = N-1; i >= k; --i)
+    {
+        a._internal[i] = 0;
+        for(int j = 1; j <= i-k; ++j)
+            a._internal[i] += a._internal[i-j]*b._internal[j];
+    }
+}
+
+// Exponential of a series
+template<class vtype,int N>
+inline iSeries<vtype,N> ExponentiateFast(const iSeries<vtype,N> &arg, RealD alpha)
+{
+    // Assuming arg._internal[0] == 0 saves half the multiplications (for large N)
+    // In reality, it seems to save about 35%
+
+    iSeries<vtype,N> xn = arg*alpha;
+    iSeries<vtype,N> temp = xn;
+    temp._internal[0] = 1.0;
+
+    for(int i = 2; i < N; ++i)
+    {
+        for(int l = N-1; l >= i; --l)
+        {
+            mult(&xn._internal[l], &xn._internal[l-1], &arg._internal[1]);
+            for(int j = 2; j <= l-i+1; ++j)
+                mac(&xn._internal[l], &xn._internal[l-j], &arg._internal[j]);
+
+            xn._internal[l] *= alpha/i;
+            temp._internal[l] += xn._internal[l];
+        }
+    }
+    return temp;
+}
+
+template<class vtype> inline iScalar<vtype> LogarithmFast(const iScalar<vtype>&r)
+{
+    iScalar<vtype> ret;
+    ret._internal = LogarithmFast(r._internal);
+    return ret;
+}
+
+template<class vtype, int N> inline iVector<vtype, N> LogarithmFast(const iVector<vtype,N>&r)
+{
+    iVector<vtype, N> ret;
+    for (int i = 0; i < N; i++)
+        ret._internal[i] = LogarithmFast(r._internal[i]);
+    return ret;
+}
+
+template<class vtype, int N> inline iSeries<vtype,N> LogarithmFast(const iSeries<vtype,N> & arg)
+{
+    // Assume arg[0] = 1 and use basic Taylor series log(1+x)=x-x^2/2+...
+    iSeries<vtype,N> xn = arg;
+    xn._internal[0] = 0.0;
+    iSeries<vtype,N> temp = xn;
+
+    for(int i = 2; i < N; ++i)
+    {
+        for(int l = N-1; l >= i; --l)
+        {
+            mult(&xn._internal[l], &xn._internal[l-1], &arg._internal[1]);
+            for(int j = 2; j <= l-i+1; ++j)
+                mac(&xn._internal[l], &xn._internal[l-j], &arg._internal[j]);
+
+            temp._internal[l] += xn._internal[l]*RealD(1.0/i * (i%2?1:-1));
+        }
+    }
+    return temp;
+}
+
 
 
 

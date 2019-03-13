@@ -62,37 +62,53 @@ namespace Grid {
     return ret;
   }
 
-  template<class obj> Lattice<obj> expMat(const Lattice<obj> &rhs, RealD alpha, Integer Nexp = DEFAULT_MAT_EXP){
-    Lattice<obj> ret(rhs._grid);
-    ret.checkerboard = rhs.checkerboard;
-    conformable(ret,rhs);
-    parallel_for(int ss=0;ss<rhs._grid->oSites();ss++){
-      ret._odata[ss]=Exponentiate(rhs._odata[ss],alpha, Nexp);
+    template<class obj> Lattice<obj> expMat(const Lattice<obj> &rhs, RealD alpha, Integer Nexp = DEFAULT_MAT_EXP)
+    {
+        Lattice<obj> ret(rhs._grid);
+        ret.checkerboard = rhs.checkerboard;
+        conformable(ret,rhs);
+        parallel_for(int ss=0;ss<rhs._grid->oSites();ss++)
+        {
+            ret._odata[ss]=Exponentiate(rhs._odata[ss],alpha, Nexp);
+        }
+        return ret;
     }
 
-    return ret;
-
-
-
-
-
-  }
-
-  template<class obj> Lattice<obj> logMat(const Lattice<obj> &rhs){
-    Lattice<obj> ret(rhs._grid);
-    ret.checkerboard = rhs.checkerboard;
-    conformable(ret,rhs);
-    parallel_for(int ss=0;ss<rhs._grid->oSites();ss++){
-      ret._odata[ss]=Logarithm(rhs._odata[ss]);
+    template<class obj> Lattice<obj> expMatFast(const Lattice<obj> &rhs, RealD alpha)
+    {
+        Lattice<obj> ret(rhs._grid);
+        ret.checkerboard = rhs.checkerboard;
+        conformable(ret,rhs);
+        parallel_for(int ss=0;ss<rhs._grid->oSites();ss++)
+        {
+            ret._odata[ss]=ExponentiateFast(rhs._odata[ss],alpha);
+        }
+        return ret;
     }
 
-    return ret;
+    template<class obj> Lattice<obj> logMat(const Lattice<obj> &rhs)
+    {
+        Lattice<obj> ret(rhs._grid);
+        ret.checkerboard = rhs.checkerboard;
+        conformable(ret,rhs);
+        parallel_for(int ss=0;ss<rhs._grid->oSites();ss++)
+        {
+            ret._odata[ss]=Logarithm(rhs._odata[ss]);
+        }
+        return ret;
+    }
 
-
-
-
-
-  }
+    template<class obj> Lattice<obj> logMatFast(const Lattice<obj> &rhs)
+    {
+        Lattice<obj> ret(rhs._grid);
+        ret.checkerboard = rhs.checkerboard;
+        conformable(ret,rhs);
+        parallel_for(int ss=0;ss<rhs._grid->oSites();ss++)
+        {
+            ret._odata[ss]=LogarithmFast(rhs._odata[ss]);
+        }
+        return ret;
+    }
 
 
 

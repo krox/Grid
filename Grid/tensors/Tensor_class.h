@@ -552,15 +552,18 @@ class iSeries {
     return ret;
   }
   // *=,+=,-= operators inherit from corresponding "*,-,+" behaviour
-  strong_inline iSeries<vtype, N> &operator*=(const iScalar<vtype> &r) {
+  template<typename T>
+  strong_inline iSeries<vtype, N> &operator*=(const T &r) {
     *this = (*this) * r;
     return *this;
   }
-  strong_inline iSeries<vtype, N> &operator-=(const iSeries<vtype, N> &r) {
+  template<typename T>
+  strong_inline iSeries<vtype, N> &operator-=(const T &r) {
     *this = (*this) - r;
     return *this;
   }
-  strong_inline iSeries<vtype, N> &operator+=(const iSeries<vtype, N> &r) {
+  template<typename T>
+  strong_inline iSeries<vtype, N> &operator+=(const T &r) {
     *this = (*this) + r;
     return *this;
   }
