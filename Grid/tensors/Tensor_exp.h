@@ -284,6 +284,41 @@ template<class vtype, int N> inline iSeries<vtype,N> LogarithmFast(const iSeries
     return temp;
 }
 
+template<class vtype> inline iScalar<vtype> ShiftSeries(const iScalar<vtype>&r, int dist)
+{
+    iScalar<vtype> ret;
+    ret._internal = ShiftSeries(r._internal, dist);
+    return ret;
+}
+
+template<class vtype, int N> inline iVector<vtype, N> ShiftSeries(const iVector<vtype,N>&r, int dist)
+{
+    iVector<vtype, N> ret;
+    for (int i = 0; i < N; i++)
+        ret._internal[i] = ShiftSeries(r._internal[i], dist);
+    return ret;
+}
+
+template<class vtype, int N> inline iMatrix<vtype, N> ShiftSeries(const iMatrix<vtype,N>&r, int dist)
+{
+    iVector<vtype, N> ret;
+    for (int i = 0; i < N; i++)
+        for (int j = 0; j < N; j++)
+            ret._internal[i][j] = ShiftSeries(r._internal[i][j], dist);
+    return ret;
+}
+
+template<class vtype, int N> inline iSeries<vtype,N> ShiftSeries(const iSeries<vtype,N> & arg, int dist)
+{
+    iSeries<vtype,N> r;
+    for(int i = 0; i < N; ++i)
+        if(i >= dist && i < N+dist)
+            r._internal[i] = arg._internal[i - dist];
+        else
+            r._internal[i] = 0.0;
+    return r;
+}
+
 
 
 

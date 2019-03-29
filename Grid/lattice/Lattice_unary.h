@@ -110,6 +110,18 @@ namespace Grid {
         return ret;
     }
 
+    template<class obj> Lattice<obj> shiftSeries(const Lattice<obj> &rhs, int dist)
+    {
+        Lattice<obj> ret(rhs._grid);
+        ret.checkerboard = rhs.checkerboard;
+        conformable(ret,rhs);
+        parallel_for(int ss=0;ss<rhs._grid->oSites();ss++)
+        {
+            ret._odata[ss]=ShiftSeries(rhs._odata[ss], dist);
+        }
+        return ret;
+    }
+
 
 
 }
