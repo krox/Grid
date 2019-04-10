@@ -1,5 +1,5 @@
    /*************************************************************************************
-    Grid physics library, www.github.com/paboyle/Grid 
+    Grid physics library, www.github.com/paboyle/Grid
     Source file: ./lib/tensors/Tensor_traits.h
     Copyright (C) 2015
 Author: Azusa Yamaguchi <ayamaguc@staffmail.ed.ac.uk>
@@ -30,12 +30,14 @@ namespace Grid {
   // Forward declarations
   template<class T>        class iScalar;
   template<class T, int N> class iVector;
+  template<class T, int N> class iSeries;
   template<class T, int N> class iMatrix;
 
   // These are the Grid tensors
   template<typename T>     struct isGridTensor                : public std::false_type { static constexpr bool notvalue = true; };
   template<class T>        struct isGridTensor<iScalar<T>>    : public std::true_type  { static constexpr bool notvalue = false; };
   template<class T, int N> struct isGridTensor<iVector<T, N>> : public std::true_type  { static constexpr bool notvalue = false; };
+  template<class T, int N> struct isGridTensor<iSeries<T, N>> : public std::true_type  { static constexpr bool notvalue = false; };
   template<class T, int N> struct isGridTensor<iMatrix<T, N>> : public std::true_type  { static constexpr bool notvalue = false; };
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -44,8 +46,8 @@ namespace Grid {
 // other classes such as RealD == double, ComplexD == std::complex<double> with these
 // traits.
 //
-// It is possible that we could do this more elegantly if I introduced a 
-// queryable trait in iScalar, iMatrix and iVector and used the query on vtype in 
+// It is possible that we could do this more elegantly if I introduced a
+// queryable trait in iScalar, iMatrix and iVector and used the query on vtype in
 // place of the type mapper?
 //
 // Not sure how to do this, but probably could be done with a research effort
@@ -226,6 +228,19 @@ namespace Grid {
       return ( dim == 0 ) ? N : BaseTraits::Dimension(dim - 1); }
   };
 
+  template<typename T, int N> struct GridTypeMapper<iSeries<T, N>> {
+    GridTypeMapper_RepeatedTypes;
+    using tensor_reduced  = iScalar<typename BaseTraits::tensor_reduced>;
+    using scalar_object   = iSeries<typename BaseTraits::scalar_object,   N>;
+    using Complexified    = iSeries<typename BaseTraits::Complexified,    N>;
+    using Realified       = iSeries<typename BaseTraits::Realified,       N>;
+    using DoublePrecision = iSeries<typename BaseTraits::DoublePrecision, N>;
+    static constexpr int Rank = BaseTraits::Rank + 1;
+    static constexpr std::size_t count = BaseTraits::count * N;
+    static constexpr int Dimension(int dim) {
+      return ( dim == 0 ) ? N : BaseTraits::Dimension(dim - 1); }
+  };
+
   template<typename T, int N> struct GridTypeMapper<iMatrix<T, N>> {
     GridTypeMapper_RepeatedTypes;
     using tensor_reduced  = iScalar<typename BaseTraits::tensor_reduced>;
@@ -260,7 +275,7 @@ namespace Grid {
   struct getVectorType{
     typedef T type;
   };
-  
+
   //Query whether a tensor or Lattice<Tensor> is SIMD vector or scalar
   template<typename T, typename V=void> struct isSIMDvectorized : public std::false_type {};
   template<typename U> struct isSIMDvectorized<U, typename std::enable_if< !std::is_same<
@@ -273,7 +288,7 @@ namespace Grid {
   class getPrecision{
   public:
     //get the vector_obj (i.e. a grid Tensor) if its a Lattice<vobj>, do nothing otherwise (i.e. if fundamental or grid Tensor)
-    typedef typename getVectorType<T>::type vector_obj; 
+    typedef typename getVectorType<T>::type vector_obj;
     typedef typename GridTypeMapper<vector_obj>::scalar_type scalar_type; //get the associated scalar type. Works on fundamental and tensor types
     typedef typename GridTypeMapper<scalar_type>::Realified real_scalar_type; //remove any std::complex wrapper, should get us to the fundamental type
 
@@ -282,4 +297,3 @@ namespace Grid {
 }
 
 #endif
-

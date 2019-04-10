@@ -447,21 +447,8 @@ class iSeries {
  public:
   vtype _internal[N];
 
-  typedef vtype element;
-  typedef typename GridTypeMapper<vtype>::scalar_type scalar_type;
-  typedef typename GridTypeMapper<vtype>::vector_type vector_type;
-  typedef typename GridTypeMapper<vtype>::vector_typeD vector_typeD;
-  typedef typename GridTypeMapper<vtype>::tensor_reduced tensor_reduced_v;
-  typedef typename GridTypeMapper<vtype>::scalar_object recurse_scalar_object;
-  typedef iScalar<tensor_reduced_v> tensor_reduced;
-  typedef iSeries<recurse_scalar_object, N> scalar_object;
-
-  // substitutes a real or complex version with same tensor structure
-  typedef iSeries<typename GridTypeMapper<vtype>::Complexified, N> Complexified;
-  typedef iSeries<typename GridTypeMapper<vtype>::Realified, N> Realified;
-
-  // get double precision version
-  typedef iSeries<typename GridTypeMapper<vtype>::DoublePrecision, N> DoublePrecision;
+  using Traits = GridTypeMapper<iSeries<vtype, N> >;
+  GridVector_CopyTraits;
 
   template <class T, typename std::enable_if<!isGridTensor<T>::value, T>::type
                          * = nullptr>
@@ -471,7 +458,6 @@ class iSeries {
     return *this;
   }
 
-  enum { TensorLevel = GridTypeMapper<vtype>::TensorLevel + 1 };
   iSeries(const Zero &z) { *this = zero; };
   iSeries() = default;
   iSeries(scalar_type s) {
