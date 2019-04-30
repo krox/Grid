@@ -96,8 +96,12 @@ namespace Grid {
   inline RealD toReal(const RealD& r){ return r; }
   inline RealF toReal(const RealF& r){ return r; }
 
-  
-  
+  inline ComplexD toComplex(const ComplexD& c){ return c; }
+  inline ComplexF toComplex(const ComplexF& c){ return c; }
+  inline ComplexD toComplex(const RealD& c){ return RealD(c); }
+  inline ComplexF toComplex(const RealF& c){ return RealF(c); }
+
+
   ////////////////////////////////////////////////////////////////////////////////
   //Provide support functions for basic real and complex data types required by Grid
   //Single and double precision versions. Should be able to template this once only.
@@ -107,14 +111,14 @@ namespace Grid {
   inline void sub (ComplexD * __restrict__ y,const ComplexD * __restrict__ l,const ComplexD *__restrict__ r){ *y = (*l) - (*r);}
   inline void add (ComplexD * __restrict__ y,const ComplexD * __restrict__ l,const ComplexD *__restrict__ r){ *y = (*l) + (*r);}
   // conjugate already supported for complex
-  
+
   inline void mac (ComplexF * __restrict__ y,const ComplexF * __restrict__ a,const ComplexF *__restrict__ x){ *y = (*a) * (*x)+(*y); }
   inline void mult(ComplexF * __restrict__ y,const ComplexF * __restrict__ l,const ComplexF *__restrict__ r){ *y = (*l) * (*r); }
   inline void sub (ComplexF * __restrict__ y,const ComplexF * __restrict__ l,const ComplexF *__restrict__ r){ *y = (*l) - (*r); }
   inline void add (ComplexF * __restrict__ y,const ComplexF * __restrict__ l,const ComplexF *__restrict__ r){ *y = (*l) + (*r); }
-  
+
   //conjugate already supported for complex
-  
+
   inline ComplexF timesI(const ComplexF &r)     { return(r*ComplexF(0.0,1.0));}
   inline ComplexD timesI(const ComplexD &r)     { return(r*ComplexD(0.0,1.0));}
   inline ComplexF timesMinusI(const ComplexF &r){ return(r*ComplexF(0.0,-1.0));}
@@ -131,23 +135,23 @@ namespace Grid {
   inline void timesI(ComplexD &ret,const ComplexD &r)     { ret = timesI(r);}
   inline void timesMinusI(ComplexF &ret,const ComplexF &r){ ret = timesMinusI(r);}
   inline void timesMinusI(ComplexD &ret,const ComplexD &r){ ret = timesMinusI(r);}
-  
+
   inline void mac (RealD * __restrict__ y,const RealD * __restrict__ a,const RealD *__restrict__ x){  *y = (*a) * (*x)+(*y);}
   inline void mult(RealD * __restrict__ y,const RealD * __restrict__ l,const RealD *__restrict__ r){ *y = (*l) * (*r);}
   inline void sub (RealD * __restrict__ y,const RealD * __restrict__ l,const RealD *__restrict__ r){ *y = (*l) - (*r);}
   inline void add (RealD * __restrict__ y,const RealD * __restrict__ l,const RealD *__restrict__ r){ *y = (*l) + (*r);}
-  
+
   inline void mac (RealF * __restrict__ y,const RealF * __restrict__ a,const RealF *__restrict__ x){  *y = (*a) * (*x)+(*y); }
   inline void mult(RealF * __restrict__ y,const RealF * __restrict__ l,const RealF *__restrict__ r){ *y = (*l) * (*r); }
   inline void sub (RealF * __restrict__ y,const RealF * __restrict__ l,const RealF *__restrict__ r){ *y = (*l) - (*r); }
   inline void add (RealF * __restrict__ y,const RealF * __restrict__ l,const RealF *__restrict__ r){ *y = (*l) + (*r); }
-  
+
   inline void vstream(ComplexF &l, const ComplexF &r){ l=r;}
   inline void vstream(ComplexD &l, const ComplexD &r){ l=r;}
   inline void vstream(RealF &l, const RealF &r){ l=r;}
   inline void vstream(RealD &l, const RealD &r){ l=r;}
-  
-  
+
+
   class Zero{};
   static Zero zero;
   template<class itype> inline void zeroit(itype &arg){ arg=zero;};
@@ -155,7 +159,7 @@ namespace Grid {
   template<>            inline void zeroit(ComplexD &arg){ arg=0; };
   template<>            inline void zeroit(RealF &arg){ arg=0; };
   template<>            inline void zeroit(RealD &arg){ arg=0; };
-  
+
 
   //////////////////////////////////////////////////////////
   // Permute
@@ -185,7 +189,7 @@ namespace Grid {
   typedef vComplexF vComplex;
 #endif
 
- 
+
   inline std::ostream& operator<< (std::ostream& stream, const vComplexF &o){
     int nn=vComplexF::Nsimd();
     std::vector<ComplexF,alignedAllocator<ComplexF> > buf(nn);
@@ -198,7 +202,7 @@ namespace Grid {
     stream<<">";
     return stream;
   }
- 
+
   inline std::ostream& operator<< (std::ostream& stream, const vComplexD &o){
     int nn=vComplexD::Nsimd();
     std::vector<ComplexD,alignedAllocator<ComplexD> > buf(nn);
