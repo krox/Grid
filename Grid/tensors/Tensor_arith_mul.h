@@ -206,6 +206,37 @@ iSeries<rtype,N> operator / (const iSeries<rtype,N>& lhs,const iScalar<vtype>& r
     return ret;
 }
 
+//////////////////////////////////////////////////////////////////
+// Divide by series
+//////////////////////////////////////////////////////////////////
+
+template<class vtype, int N> strong_inline
+iSeries<vtype,N> seriesInverse(const iSeries<vtype, N>& a)
+{
+    iSeries<vtype,N> b;
+    b._internal[0] = vtype(1.0) / a._internal[0];
+    for(int n = 1; n < N; ++n)
+    {
+        b._internal[n] = 0.0;
+        for(int i= 1; i <= n; ++i)
+            b._internal[n] += a._internal[i]*b._internal[n-i];
+        b._internal[n] = -b._internal[0]*b._internal[n];
+    }
+    return b;
+}
+
+template<class rtype,class vtype, int N> strong_inline
+iSeries<rtype,N> operator / (const iScalar<rtype>& lhs,const iSeries<vtype,N>& rhs)
+{
+    return lhs * seriesInverse(rhs);
+}
+
+template<class rtype,class vtype, int N> strong_inline
+iSeries<rtype,N> operator / (const iSeries<rtype,N>& lhs,const iSeries<vtype,N>& rhs)
+{
+    return lhs * seriesInverse(rhs);
+}
+
     //////////////////////////////////////////////////////////////////
     // Glue operators to mult routines. Must resolve return type cleverly from typeof(internal)
     // since nesting matrix<scalar> x matrix<matrix>-> matrix<matrix>
