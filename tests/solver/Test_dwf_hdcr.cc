@@ -563,16 +563,16 @@ int main (int argc, char ** argv)
   Aggregates.CreateSubspace(RNG5,HermDefOp,nb);
   //  Aggregates.CreateSubspaceLanczos(RNG5,HermDefOp,nb);
   for(int n=0;n<nb;n++){
-    G5R5(Aggregates.subspace[n+nb],Aggregates.subspace[n]);
-    std::cout<<GridLogMessage<<n<<" subspace "<<norm2(Aggregates.subspace[n+nb])<<" "<<norm2(Aggregates.subspace[n]) <<std::endl;
+    G5R5(Aggregates.Subspace()[n+nb],Aggregates.Subspace()[n]);
+    std::cout<<GridLogMessage<<n<<" subspace "<<norm2(Aggregates.Subspace()[n+nb])<<" "<<norm2(Aggregates.Subspace()[n]) <<std::endl;
   }
   for(int n=0;n<nbasis;n++){
-    std::cout<<GridLogMessage << "vec["<<n<<"] = "<<norm2(Aggregates.subspace[n])  <<std::endl;
+    std::cout<<GridLogMessage << "vec["<<n<<"] = "<<norm2(Aggregates.Subspace()[n])  <<std::endl;
   }
 
 //  for(int i=0;i<nbasis;i++){
-//    result =     Aggregates.subspace[i];
-//    Aggregates.subspace[i]=result+g5*result;
+//    result =     Aggregates.Subspace()[i];
+//    Aggregates.Subspace()[i]=result+g5*result;
 //  }
   result=zero;
   

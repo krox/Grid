@@ -33,6 +33,13 @@ using namespace std;
 using namespace Grid;
 using namespace Grid::QCD;
 
+// Enable control of nbasis from the compiler command line
+// NOTE to self: Copy the value of CXXFLAGS from the makefile and call make as follows:
+//   make CXXFLAGS="-DNBASIS=24 VALUE_OF_CXXFLAGS_IN_MAKEFILE" Test_wilsonclover_mg_mp
+#ifndef NBASIS
+#define NBASIS 40
+#endif
+
 int main(int argc, char **argv) {
 
   Grid_init(&argc, &argv);
@@ -44,51 +51,76 @@ int main(int argc, char **argv) {
   GridRedBlackCartesian *FrbGrid_f = SpaceTimeGrid::makeFourDimRedBlackGrid(FGrid_f);
   // clang-format on
 
+  MGTestParams params;
+
+  if(GridCmdOptionExists(argv, argv + argc, "--inputxml")) {
+    std::string inputXml = GridCmdOptionPayload(argv, argv + argc, "--inputxml");
+    assert(inputXml.length() != 0);
+
+    XmlReader reader(inputXml);
+    read(reader, "Params", params);
+    std::cout << GridLogMessage << "Read in " << inputXml << std::endl;
+  }
+
+  // {
+  //   XmlWriter writer("mg_params_template.xml");
+  //   write(writer, "Params", params);
+  //   std::cout << GridLogMessage << "Written mg_params_template.xml" << std::endl;
+  // }
+
+  checkParameterValidity(params);
+  std::cout << params << std::endl;
+
+  LevelInfo levelInfo_d(FGrid_d, params.mg);
+  LevelInfo levelInfo_f(FGrid_f, params.mg);
+
+  const int nbasis = NBASIS;
+#if !defined(USE_TWOSPIN_COARSENING)
+  static_assert((nbasis & 0x1) == 0, "");
+#endif
+
   std::vector<int> fSeeds({1, 2, 3, 4});
   GridParallelRNG  fPRNG(FGrid_d);
   fPRNG.SeedFixedIntegers(fSeeds);
 
   // clang-format off
-  LatticeFermionD       src_d(FGrid_d); gaussian(fPRNG, src_d);
+  LatticeFermionD       src_d(FGrid_d);
   LatticeFermionD resultMGD_d(FGrid_d); resultMGD_d = zero;
   LatticeFermionD resultMGF_d(FGrid_d); resultMGF_d = zero;
-  LatticeGaugeFieldD    Umu_d(FGrid_d); SU3::HotConfiguration(fPRNG, Umu_d);
-  LatticeGaugeFieldF    Umu_f(FGrid_f); precisionChange(Umu_f, Umu_d);
+  LatticeGaugeFieldD    Umu_d(FGrid_d);
+  LatticeGaugeFieldF    Umu_f(FGrid_f);
   // clang-format on
 
-  RealD mass  = -0.25;
-  RealD csw_r = 1.0;
-  RealD csw_t = 1.0;
+  if(params.test.sourceType == "ones")
+    src_d = 1.;
+  else if(params.test.sourceType == "random")
+    random(fPRNG, src_d);
+  else if(params.test.sourceType == "gaussian")
+    gaussian(fPRNG, src_d);
 
-  MultiGridParams mgParams;
-  std::string     inputXml{"./mg_params.xml"};
+  if(params.test.config != "foo") {
+    FieldMetaData header;
+    IldgReader    _IldgReader;
+    _IldgReader.open(params.test.config);
+    _IldgReader.readConfiguration(Umu_d, header);
+    _IldgReader.close();
+  } else
+    SU3::HotConfiguration(fPRNG, Umu_d);
+  precisionChange(Umu_f, Umu_d);
 
-  if(GridCmdOptionExists(argv, argv + argc, "--inputxml")) {
-    inputXml = GridCmdOptionPayload(argv, argv + argc, "--inputxml");
-    assert(inputXml.length() != 0);
+  typename WilsonCloverFermionD::ImplParams implParams_d;
+  typename WilsonCloverFermionF::ImplParams implParams_f;
+  WilsonAnisotropyCoefficients              anisParams;
+  if(params.test.useAntiPeriodicBC) {
+    implParams_d.boundary_phases = {+1, +1, +1, -1};
+    implParams_f.boundary_phases = {+1, +1, +1, -1};
+  } else {
+    implParams_d.boundary_phases = {+1, +1, +1, +1};
+    implParams_f.boundary_phases = {+1, +1, +1, +1};
   }
 
-  {
-    XmlWriter writer("mg_params_template.xml");
-    write(writer, "Params", mgParams);
-    std::cout << GridLogMessage << "Written mg_params_template.xml" << std::endl;
-
-    XmlReader reader(inputXml);
-    read(reader, "Params", mgParams);
-    std::cout << GridLogMessage << "Read in " << inputXml << std::endl;
-  }
-
-  checkParameterValidity(mgParams);
-  std::cout << mgParams << std::endl;
-
-  LevelInfo levelInfo_d(FGrid_d, mgParams);
-  LevelInfo levelInfo_f(FGrid_f, mgParams);
-
-  // Note: We do chiral doubling, so actually only nbasis/2 full basis vectors are used
-  const int nbasis = 40;
-
-  WilsonCloverFermionD Dwc_d(Umu_d, *FGrid_d, *FrbGrid_d, mass, csw_r, csw_t);
-  WilsonCloverFermionF Dwc_f(Umu_f, *FGrid_f, *FrbGrid_f, mass, csw_r, csw_t);
+  WilsonCloverFermionD Dwc_d(Umu_d, *FGrid_d, *FrbGrid_d, params.test.mass, params.test.csw, params.test.csw, anisParams, implParams_d);
+  WilsonCloverFermionF Dwc_f(Umu_f, *FGrid_f, *FrbGrid_f, params.test.mass, params.test.csw, params.test.csw, anisParams, implParams_f);
 
   MdagMLinearOperator<WilsonCloverFermionD, LatticeFermionD> MdagMOpDwc_d(Dwc_d);
   MdagMLinearOperator<WilsonCloverFermionF, LatticeFermionF> MdagMOpDwc_f(Dwc_f);
@@ -97,19 +129,34 @@ int main(int argc, char **argv) {
   std::cout << GridLogMessage << "Testing single-precision Multigrid for Wilson Clover" << std::endl;
   std::cout << GridLogMessage << "**************************************************" << std::endl;
 
-  auto MGPreconDwc_f = createMGInstance<vSpinColourVectorF, vTComplexF, nbasis, WilsonCloverFermionF>(mgParams, levelInfo_f, Dwc_f, Dwc_f);
+#if defined(USE_TWOSPIN_COARSENING)
+  auto MGPreconDwc_f = createMGInstance<vSpinColourVectorF,  vComplexF,  nbasis / 2, WilsonCloverFermionF>(params.mg, levelInfo_f, Dwc_f, Dwc_f);
+#elif defined(USE_ONESPIN_COARSENING)
+  auto MGPreconDwc_f = createMGInstance<vSpinColourVectorF,  vComplexF, nbasis,      WilsonCloverFermionF>(params.mg, levelInfo_f, Dwc_f, Dwc_f);
+#else // corresponds to original coarsening
+  auto MGPreconDwc_f = createMGInstance<vSpinColourVectorF, vTComplexF, nbasis,      WilsonCloverFermionF>(params.mg, levelInfo_f, Dwc_f, Dwc_f);
+#endif
 
-  MGPreconDwc_f->setup();
+  bool doRunChecks = (GridCmdOptionExists(argv, argv + argc, "--runchecks")) ? true : false;
 
-  if(GridCmdOptionExists(argv, argv + argc, "--runchecks")) {
-    MGPreconDwc_f->runChecks(1e-6);
-  }
+  MGPreconDwc_f->initialSetup();
+  if(doRunChecks) MGPreconDwc_f->runChecks(1e-6);
+
+  MGPreconDwc_f->iterativeSetup();
+  if(doRunChecks) MGPreconDwc_f->runChecks(1e-6);
+
+  auto outerSolverMaxIter = params.test.outerSolverMaxOuterIter * params.test.outerSolverMaxInnerIter;
 
   MixedPrecisionFlexibleGeneralisedMinimalResidual<LatticeFermionD, LatticeFermionF> MPFGMRESPREC(
-    1.0e-12, 50000, FGrid_f, *MGPreconDwc_f, 100, false);
+    params.test.outerSolverTol, outerSolverMaxIter, FGrid_f, *MGPreconDwc_f, params.test.outerSolverMaxInnerIter, false);
 
+  GridStopWatch solveTimer;
+  solveTimer.Reset();
   std::cout << std::endl << "Starting with a new solver" << std::endl;
+  solveTimer.Start();
   MPFGMRESPREC(MdagMOpDwc_d, src_d, resultMGF_d);
+  solveTimer.Stop();
+  std::cout << GridLogMessage << "Solver took: " << solveTimer.Elapsed() << std::endl;
 
   MGPreconDwc_f->reportTimings();
 
@@ -119,18 +166,29 @@ int main(int argc, char **argv) {
     std::cout << GridLogMessage << "Testing double-precision Multigrid for Wilson Clover" << std::endl;
     std::cout << GridLogMessage << "**************************************************" << std::endl;
 
-    auto MGPreconDwc_d = createMGInstance<vSpinColourVectorD, vTComplexD, nbasis, WilsonCloverFermionD>(mgParams, levelInfo_d, Dwc_d, Dwc_d);
+#if defined(USE_TWOSPIN_COARSENING)
+    auto MGPreconDwc_d = createMGInstance<vSpinColourVectorD,  vComplexD, nbasis / 2, WilsonCloverFermionD>(params.mg, levelInfo_d, Dwc_d, Dwc_d);
+#elif defined(USE_ONESPIN_COARSENING)
+    auto MGPreconDwc_d = createMGInstance<vSpinColourVectorD,  vComplexD, nbasis,     WilsonCloverFermionD>(params.mg, levelInfo_d, Dwc_d, Dwc_d);
+#else // corresponds to original coarsening
+    auto MGPreconDwc_d = createMGInstance<vSpinColourVectorD, vTComplexD, nbasis,     WilsonCloverFermionD>(params.mg, levelInfo_d, Dwc_d, Dwc_d);
+#endif
 
-    MGPreconDwc_d->setup();
+    MGPreconDwc_d->initialSetup();
+    if(doRunChecks) MGPreconDwc_d->runChecks(1e-13);
 
-    if(GridCmdOptionExists(argv, argv + argc, "--runchecks")) {
-      MGPreconDwc_d->runChecks(1e-13);
-    }
+    MGPreconDwc_d->iterativeSetup();
+    if(doRunChecks) MGPreconDwc_d->runChecks(1e-13);
 
-    FlexibleGeneralisedMinimalResidual<LatticeFermionD> FGMRESPREC(1.0e-12, 50000, *MGPreconDwc_d, 100, false);
+    FlexibleGeneralisedMinimalResidual<LatticeFermionD> FGMRESPREC(
+      params.test.outerSolverTol, outerSolverMaxIter, *MGPreconDwc_d, params.test.outerSolverMaxInnerIter, false);
 
+    solveTimer.Reset();
     std::cout << std::endl << "Starting with a new solver" << std::endl;
+    solveTimer.Start();
     FGMRESPREC(MdagMOpDwc_d, src_d, resultMGD_d);
+    solveTimer.Stop();
+    std::cout << GridLogMessage << "Solver took: " << solveTimer.Elapsed() << std::endl;
 
     MGPreconDwc_d->reportTimings();
 

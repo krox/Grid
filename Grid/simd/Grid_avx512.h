@@ -484,8 +484,18 @@ namespace Optimization {
   //////////////////////////////////////////////
   // Some Template specialization
 
-  // Hack for CLANG until mm512_reduce_add_ps etc... are implemented in GCC and Clang releases
-#ifndef __INTEL_COMPILER
+  // Hack for older GCC and Clang releases that do not implement mm512_reduce_add_ps etc...
+#define CLANG_VERSION (__clang_major__ * 10000 \
+                     + __clang_minor__ * 100   \
+                     + __clang_patchlevel__)
+
+#define GCC_VERSION (__GNUC__       * 10000 \
+                   + __GNUC_MINOR__ * 100   \
+                   + __GNUC_PATCHLEVEL__)
+
+#if !defined(__INTEL_COMPILER) && \
+     (CLANG_VERSION < 40000)   && \
+     (GCC_VERSION   < 70100)
 #warning "Slow reduction due to incomplete reduce intrinsics"
   //Complex float Reduce
   template<>
@@ -591,6 +601,8 @@ namespace Optimization {
     return _mm512_reduce_add_epi32(in);
   }
 #endif
+#undef CLANG_VERSION
+#undef GCC_VERSION
   
   
 }

@@ -47,9 +47,11 @@ class FlexibleCommunicationAvoidingGeneralisedMinimalResidual : public OperatorF
 
   GridStopWatch MatrixTimer;
   GridStopWatch PrecTimer;
+  GridStopWatch OrthogTimer;
   GridStopWatch LinalgTimer;
   GridStopWatch QrTimer;
   GridStopWatch CompSolutionTimer;
+  GridStopWatch AllocationTimer;
 
   Eigen::MatrixXcd H;
 
@@ -99,9 +101,11 @@ class FlexibleCommunicationAvoidingGeneralisedMinimalResidual : public OperatorF
 
     PrecTimer.Reset();
     MatrixTimer.Reset();
+    OrthogTimer.Reset();
     LinalgTimer.Reset();
     QrTimer.Reset();
     CompSolutionTimer.Reset();
+    AllocationTimer.Reset();
 
     GridStopWatch SolverTimer;
     SolverTimer.Start();
@@ -132,9 +136,11 @@ class FlexibleCommunicationAvoidingGeneralisedMinimalResidual : public OperatorF
         std::cout << GridLogMessage << "FCAGMRES Time elapsed: Total   " <<       SolverTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "FCAGMRES Time elapsed: Precon  " <<         PrecTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "FCAGMRES Time elapsed: Matrix  " <<       MatrixTimer.Elapsed() << std::endl;
+        std::cout << GridLogMessage << "FCAGMRES Time elapsed: Orthog  " <<       OrthogTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "FCAGMRES Time elapsed: Linalg  " <<       LinalgTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "FCAGMRES Time elapsed: QR      " <<           QrTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "FCAGMRES Time elapsed: CompSol " << CompSolutionTimer.Elapsed() << std::endl;
+        std::cout << GridLogMessage << "FCAGMRES Time elapsed: Allocs  " <<   AllocationTimer.Elapsed() << std::endl;
         return;
       }
     }
@@ -149,12 +155,14 @@ class FlexibleCommunicationAvoidingGeneralisedMinimalResidual : public OperatorF
 
     RealD cp = 0;
 
+    AllocationTimer.Start();
     Field w(src._grid);
     Field r(src._grid);
 
     // these should probably be made class members so that they are only allocated once, not in every restart
     std::vector<Field> v(RestartLength + 1, src._grid); for (auto &elem : v) elem = zero;
     std::vector<Field> z(RestartLength + 1, src._grid); for (auto &elem : z) elem = zero;
+    AllocationTimer.Stop();
 
     MatrixTimer.Start();
     LinOp.Op(psi, w);
@@ -203,7 +211,7 @@ class FlexibleCommunicationAvoidingGeneralisedMinimalResidual : public OperatorF
     LinOp.Op(z[iter], w);
     MatrixTimer.Stop();
 
-    LinalgTimer.Start();
+    OrthogTimer.Start();
     for (int i = 0; i <= iter; ++i) {
       H(iter, i) = innerProduct(v[i], w);
       w = w - H(iter, i) * v[i];
@@ -211,7 +219,7 @@ class FlexibleCommunicationAvoidingGeneralisedMinimalResidual : public OperatorF
 
     H(iter, iter + 1) = sqrt(norm2(w));
     v[iter + 1] = (1. / H(iter, iter + 1)) * w;
-    LinalgTimer.Stop();
+    OrthogTimer.Stop();
   }
 
   void qrUpdate(int iter) {

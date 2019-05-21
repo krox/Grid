@@ -123,7 +123,7 @@ int main (int argc, char ** argv)
   Subspace Aggregates(Coarse5d,FGrid,cb);
   Aggregates.CreateSubspaceRandom(RNG5);
 
-  subspace=Aggregates.subspace;
+  subspace=Aggregates.Subspace();
 
   std::cout<<GridLogMessage << "Called aggregation class"<< std::endl;
 

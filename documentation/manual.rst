@@ -2074,12 +2074,12 @@ They are also specialised to ILDG format writers, available and defined only for
 
   void checkpointFine(std::string evecs_file,std::string evals_file)
   {
-    assert(this->_Aggregate.subspace.size()==nbasis);
+    assert(this->_Aggregate.Subspace().size()==nbasis);
     emptyUserRecord record;
     Grid::ScidacWriter WR;
     WR.open(evecs_file);
     for(int k=0;k<nbasis;k++) {
-      WR.writeScidacFieldRecord(this->_Aggregate.subspace[k],record);
+      WR.writeScidacFieldRecord(this->_Aggregate.Subspace()[k],record);
     }
     WR.close();
     

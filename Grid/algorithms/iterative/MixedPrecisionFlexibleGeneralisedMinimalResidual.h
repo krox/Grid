@@ -47,10 +47,12 @@ class MixedPrecisionFlexibleGeneralisedMinimalResidual : public OperatorFunction
 
   GridStopWatch MatrixTimer;
   GridStopWatch PrecTimer;
+  GridStopWatch OrthogTimer;
   GridStopWatch LinalgTimer;
   GridStopWatch QrTimer;
   GridStopWatch CompSolutionTimer;
   GridStopWatch ChangePrecTimer;
+  GridStopWatch AllocationTimer;
 
   Eigen::MatrixXcd H;
 
@@ -102,10 +104,12 @@ class MixedPrecisionFlexibleGeneralisedMinimalResidual : public OperatorFunction
 
     PrecTimer.Reset();
     MatrixTimer.Reset();
+    OrthogTimer.Reset();
     LinalgTimer.Reset();
     QrTimer.Reset();
     CompSolutionTimer.Reset();
     ChangePrecTimer.Reset();
+    AllocationTimer.Reset();
 
     GridStopWatch SolverTimer;
     SolverTimer.Start();
@@ -136,10 +140,12 @@ class MixedPrecisionFlexibleGeneralisedMinimalResidual : public OperatorFunction
         std::cout << GridLogMessage << "MPFGMRES Time elapsed: Total      " <<       SolverTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "MPFGMRES Time elapsed: Precon     " <<         PrecTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "MPFGMRES Time elapsed: Matrix     " <<       MatrixTimer.Elapsed() << std::endl;
+        std::cout << GridLogMessage << "MPFGMRES Time elapsed: Orthog     " <<       OrthogTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "MPFGMRES Time elapsed: Linalg     " <<       LinalgTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "MPFGMRES Time elapsed: QR         " <<           QrTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "MPFGMRES Time elapsed: CompSol    " << CompSolutionTimer.Elapsed() << std::endl;
         std::cout << GridLogMessage << "MPFGMRES Time elapsed: PrecChange " <<   ChangePrecTimer.Elapsed() << std::endl;
+        std::cout << GridLogMessage << "MPFGMRES Time elapsed: Allocs     " <<   AllocationTimer.Elapsed() << std::endl;
         return;
       }
     }
@@ -154,12 +160,14 @@ class MixedPrecisionFlexibleGeneralisedMinimalResidual : public OperatorFunction
 
     RealD cp = 0;
 
+    AllocationTimer.Start();
     FieldD w(src._grid);
     FieldD r(src._grid);
 
     // these should probably be made class members so that they are only allocated once, not in every restart
     std::vector<FieldD> v(RestartLength + 1, src._grid); for (auto &elem : v) elem = zero;
     std::vector<FieldD> z(RestartLength + 1, src._grid); for (auto &elem : z) elem = zero;
+    AllocationTimer.Stop();
 
     MatrixTimer.Start();
     LinOp.Op(psi, w);
@@ -220,7 +228,7 @@ class MixedPrecisionFlexibleGeneralisedMinimalResidual : public OperatorFunction
     LinOp.Op(z[iter], w);
     MatrixTimer.Stop();
 
-    LinalgTimer.Start();
+    OrthogTimer.Start();
     for (int i = 0; i <= iter; ++i) {
       H(iter, i) = innerProduct(v[i], w);
       w = w - H(iter, i) * v[i];
@@ -228,7 +236,7 @@ class MixedPrecisionFlexibleGeneralisedMinimalResidual : public OperatorFunction
 
     H(iter, iter + 1) = sqrt(norm2(w));
     v[iter + 1] = (1. / H(iter, iter + 1)) * w;
-    LinalgTimer.Stop();
+    OrthogTimer.Stop();
   }
 
   void qrUpdate(int iter) {
