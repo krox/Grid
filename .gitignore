@@ -125,3 +125,5 @@ settings.json
 ###########################################
 .ccls-cache
 .cquery_cached_index
+
+Grid/util/Version.h
